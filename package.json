@@ -1,0 +1,39 @@
+{
+  "name": "@stexcore/api-engine",
+  "version": "1.0.0",
+  "description": "Core for rapidly developing an API using Express under the hood",
+  "main": "dist/index.js",
+  "bugs": {
+    "url": "https://github.com/stexcore/api-engine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stexcore/api-engine.git"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "engines": {
+    "javascript": ">=2016"
+  },
+  "keywords": [
+    "api",
+    "node",
+    "typescript",
+    "express",
+    "core",
+    "http"
+  ],
+  "author": "stexcore",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.17",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@stexcore/http-status": "^1.0.1",
+    "express": "^5.1.0",
+    "joi": "^17.13.3"
+  }
+}
