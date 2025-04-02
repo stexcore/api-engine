@@ -8,6 +8,7 @@ import fs from "fs";
 import Schema from "./class/schema";
 import schemaMiddleware from "./middlewares/schema.middleware";
 import catchHttpErrorMiddleware from "./middlewares/catchHttpError.middleware";
+import { Sequelize } from "sequelize";
 
 /**
  * Server instance
@@ -25,9 +26,33 @@ export default class Server {
     public readonly server: http.Server;
 
     /**
+     * Server Port
+     */
+    protected port: number;
+
+    /**
+     * Workdir to work
+     */
+    protected workdir: string
+
+    /**
      * All services 
      */
     public readonly services: Service[] = [];
+
+    /**
+     * All connections
+     */
+    public readonly connections: {
+        /**
+         * Connection name
+         */
+        name: string,
+        /**
+         * Connection sequelize
+         */
+        sequelize: Sequelize
+    }[] = [];
 
     /**
      * Controllers loaded
@@ -69,7 +94,13 @@ export default class Server {
      * Middleware loaded
      */
     public middlewaresLoaded: {
+        /**
+         * Path scope middleware
+         */
         path: string,
+        /**
+         * Middleware request handler
+         */
         middleware: RequestHandler 
     }[] = [];
 
@@ -92,16 +123,6 @@ export default class Server {
          */
         reject: (err: unknown) => void
     }[] = [];
-
-    /**
-     * Server Port
-     */
-    protected port: number;
-
-    /**
-     * Workdir to work
-     */
-    protected workdir: string
     
     /**
      * Initialize server instance
@@ -114,191 +135,6 @@ export default class Server {
 
         // Load services and controllers
         this.loadServer();
-    }
-
-    /**
-     * Load all modules to server
-     */
-    private async loadServer() {
-        try {
-            
-            // Append spacing
-            console.log("");
-
-            // Load all services
-            await this.loadServices();
-            // Load all middlewares
-            await this.loadMiddlewares();
-            // Append handler
-            this.appendHandler();
-            // Load all schemas
-            await this.loadSchemas();
-            // Load all controllers
-            await this.loadControllers();
-        }
-        catch(err) {
-            console.error(err);
-        }
-        finally {
-            // Toogle loading module
-            this.loading_modules = false;
-
-            // Resolve promise initialize
-            this.initialize_promises.forEach((promiseItem) => {
-                promiseItem.resolve();
-            });
-
-            // Remove promises
-            this.initialize_promises = [];
-    
-            // Set catch errors middleware
-            this.app.use(catchHttpErrorMiddleware);
-            this.app.use(catchHttpErrorMiddleware);
-        }
-    }
-
-    /**
-     * Append handler requests incomming
-     */
-    private appendHandler() {
-        // Append request handler
-        this.app.use((req, res, next) => {
-            try {
-                // Find controller existent
-                let controllerData = this.controllersLoaded.find((c => (
-                    c.type === "static" && 
-                    c.path === req.path
-                )));
-
-                // Validate if not found
-                if(!controllerData) {
-                    const [_, ...segments] = req.path.replace(/\/+$/, "").split("/");
-
-                    // Find with route dynamic
-                    controllerData = this.controllersLoaded.find((c) => (
-                        c.segments.length === segments.length &&
-                        c.segments.every((s, i) => (
-                            s.type === "static" ? (s.segment === segments[i]) : true
-                        ))
-                    ));
-
-                    if(controllerData) {
-                        controllerData.segments.forEach((s, i) => {
-                            if(s.type === "dynamic") {
-                                req.params[s.param] = segments[i];
-                            }
-                        })
-                    }
-                }
-
-
-                // Get middlewares
-                const middlewaresParent = this.middlewaresLoaded.filter(m => req.path.startsWith(m.path));
-
-                // apply middleware parent
-                this.applyRequestHandlers(req, res, middlewaresParent.map(m => m.middleware), (err) => {
-                    // Forward error
-                    if(err) return next(err);
-
-                    // Is found?
-                    if(controllerData) {
-                        // Get method request incomming
-                        const method = req.method.toUpperCase() as IMethod;
-                        // Get request handler
-                        const requestHandler: express.RequestHandler | undefined = controllerData.controller[method];
-                        // Get schema
-                        const schemaInformation = this.schemasLoaded.find((s) => s.path === controllerData.path);
-
-                        // Validate handler avariable
-                        if(requestHandler) {
-                            // Get middlewares
-                            const middlewares = this.middlewaresLoaded
-                                .filter(m => controllerData.path.startsWith(m.path))
-                                .filter(m => middlewaresParent.every(({middleware}) => middleware !== m.middleware));
-                            // Append middlewares
-                            const requestHandlersEnque: express.RequestHandler[] = [
-                                // Append middlewares loaded
-                                ...(middlewares.map(m => m.middleware)),
-                                // Append handler request
-                                requestHandler
-                            ];
-
-                            // Append schema middlewares
-                            if(schemaInformation) {
-                                // Extract schema
-                                const { schema } = schemaInformation;
-
-                                for(const keyname in schema) {
-                                    const key = keyname as keyof ISchema;
-                                    const schemaItem = schema[key];
-
-                                    if(schemaItem) {
-                                        if(schemaItem.body) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.body, "body"));
-                                        if(schemaItem.query) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.query, "query"));
-                                        if(schemaItem.params) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.params, "params"));
-                                    }
-                                }
-                            }
-
-                            // Apply middlewares
-                            this.applyRequestHandlers(req, res, requestHandlersEnque, (err) => {
-                                // Forward error
-                                if(err) return next(err);
-                            });
-                        }
-                        else {
-                            // Forward request incomming
-                            next();
-                        }
-                    }
-                    else {
-                        next();
-                    }
-                });
-            }
-            catch(err) {
-                next(err);
-            }
-        });
-    }
-
-    /**
-     * Analize middlewares handlers
-     * @param req Request incomming
-     * @param res Response incomming
-     * @param handlers Handler Requests
-     * @param callback Callback result
-     */
-    private applyRequestHandlers(req: Request, res: Response, handlers: RequestHandler[], callback: (err?: unknown) => void) {
-        try {
-            // Index request handler
-            let index = 0;
-
-            // Next request handler
-            const nextRequestHandler: express.NextFunction = (err?: unknown) => {
-                if(err) {
-                    // Send error
-                    callback(err);
-                }
-                else {
-                    // Get middleware
-                    const middleware = handlers[index++];
-
-                    if(middleware) {
-                        middleware(req, res, nextRequestHandler);
-                    }
-                    else {
-                        callback();
-                    }
-                }
-            }
-
-            // Next handler
-            nextRequestHandler();
-        }
-        catch(err) {
-            callback(err);
-        }
     }
 
     /**
@@ -386,6 +222,47 @@ export default class Server {
                 reject(err);
             }
         });
+    }
+
+    /**
+     * Load all modules to server
+     */
+    private async loadServer() {
+        try {
+            
+            // Append spacing
+            console.log("");
+
+            // Load all services
+            await this.loadServices();
+            // Load all middlewares
+            await this.loadMiddlewares();
+            // Append handler
+            this.appendHandler();
+            // Load all schemas
+            await this.loadSchemas();
+            // Load all controllers
+            await this.loadControllers();
+        }
+        catch(err) {
+            console.error(err);
+        }
+        finally {
+            // Toogle loading module
+            this.loading_modules = false;
+
+            // Resolve promise initialize
+            this.initialize_promises.forEach((promiseItem) => {
+                promiseItem.resolve();
+            });
+
+            // Remove promises
+            this.initialize_promises = [];
+    
+            // Set catch errors middleware
+            this.app.use(catchHttpErrorMiddleware);
+            this.app.use(catchHttpErrorMiddleware);
+        }
     }
 
     /**
@@ -608,6 +485,150 @@ export default class Server {
                     console.log("❌ Failed to load the controller: " + pathController);
                 }
             }
+        }
+    }
+
+    /**
+     * Append handler requests incomming
+     */
+    private appendHandler() {
+        // Append request handler
+        this.app.use((req, res, next) => {
+            try {
+                // Find controller existent
+                let controllerData = this.controllersLoaded.find((c => (
+                    c.type === "static" && 
+                    c.path === req.path
+                )));
+
+                // Validate if not found
+                if(!controllerData) {
+                    const [_, ...segments] = req.path.replace(/\/+$/, "").split("/");
+
+                    // Find with route dynamic
+                    controllerData = this.controllersLoaded.find((c) => (
+                        c.segments.length === segments.length &&
+                        c.segments.every((s, i) => (
+                            s.type === "static" ? (s.segment === segments[i]) : true
+                        ))
+                    ));
+
+                    if(controllerData) {
+                        controllerData.segments.forEach((s, i) => {
+                            if(s.type === "dynamic") {
+                                req.params[s.param] = segments[i];
+                            }
+                        })
+                    }
+                }
+
+
+                // Get middlewares
+                const middlewaresParent = this.middlewaresLoaded.filter(m => req.path.startsWith(m.path));
+
+                // apply middleware parent
+                this.applyRequestHandlers(req, res, middlewaresParent.map(m => m.middleware), (err) => {
+                    // Forward error
+                    if(err) return next(err);
+
+                    // Is found?
+                    if(controllerData) {
+                        // Get method request incomming
+                        const method = req.method.toUpperCase() as IMethod;
+                        // Get request handler
+                        const requestHandler: express.RequestHandler | undefined = controllerData.controller[method];
+                        // Get schema
+                        const schemaInformation = this.schemasLoaded.find((s) => s.path === controllerData.path);
+
+                        // Validate handler avariable
+                        if(requestHandler) {
+                            // Get middlewares
+                            const middlewares = this.middlewaresLoaded
+                                .filter(m => controllerData.path.startsWith(m.path))
+                                .filter(m => middlewaresParent.every(({middleware}) => middleware !== m.middleware));
+                            // Append middlewares
+                            const requestHandlersEnque: express.RequestHandler[] = [
+                                // Append middlewares loaded
+                                ...(middlewares.map(m => m.middleware)),
+                                // Append handler request
+                                requestHandler
+                            ];
+
+                            // Append schema middlewares
+                            if(schemaInformation) {
+                                // Extract schema
+                                const { schema } = schemaInformation;
+
+                                for(const keyname in schema) {
+                                    const key = keyname as keyof ISchema;
+                                    const schemaItem = schema[key];
+
+                                    if(schemaItem) {
+                                        if(schemaItem.body) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.body, "body"));
+                                        if(schemaItem.query) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.query, "query"));
+                                        if(schemaItem.params) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.params, "params"));
+                                    }
+                                }
+                            }
+
+                            // Apply middlewares
+                            this.applyRequestHandlers(req, res, requestHandlersEnque, (err) => {
+                                // Forward error
+                                if(err) return next(err);
+                            });
+                        }
+                        else {
+                            // Forward request incomming
+                            next();
+                        }
+                    }
+                    else {
+                        next();
+                    }
+                });
+            }
+            catch(err) {
+                next(err);
+            }
+        });
+    }
+
+    /**
+     * Analize middlewares handlers
+     * @param req Request incomming
+     * @param res Response incomming
+     * @param handlers Handler Requests
+     * @param callback Callback result
+     */
+    private applyRequestHandlers(req: Request, res: Response, handlers: RequestHandler[], callback: (err?: unknown) => void) {
+        try {
+            // Index request handler
+            let index = 0;
+
+            // Next request handler
+            const nextRequestHandler: express.NextFunction = (err?: unknown) => {
+                if(err) {
+                    // Send error
+                    callback(err);
+                }
+                else {
+                    // Get middleware
+                    const middleware = handlers[index++];
+
+                    if(middleware) {
+                        middleware(req, res, nextRequestHandler);
+                    }
+                    else {
+                        callback();
+                    }
+                }
+            }
+
+            // Next handler
+            nextRequestHandler();
+        }
+        catch(err) {
+            callback(err);
         }
     }
    
