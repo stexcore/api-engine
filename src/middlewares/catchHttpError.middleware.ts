@@ -1,5 +1,5 @@
 import { ErrorRequestHandler } from "express";
-import httpStatus from "@stexcore/http-status";
+import { isHttpError } from "@stexcore/http-status";
 
 /**
  * Catch http error middleware
@@ -11,8 +11,8 @@ import httpStatus from "@stexcore/http-status";
 const catchHttpErrorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
     try {
         // Validate if is http error
-        if(httpStatus.isHttpError(err)) {
-            res.json(err);
+        if(isHttpError(err)) {
+            res.status(err.statusCode).json(err);
         }
         else next(err);
     }
