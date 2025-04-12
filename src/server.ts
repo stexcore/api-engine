@@ -8,7 +8,6 @@ import fs from "fs";
 import Schema from "./class/schema";
 import schemaMiddleware from "./middlewares/schema.middleware";
 import catchHttpErrorMiddleware from "./middlewares/catchHttpError.middleware";
-import { Sequelize } from "sequelize";
 
 /**
  * Server instance
@@ -39,20 +38,6 @@ export default class Server {
      * All services 
      */
     public readonly services: Service[] = [];
-
-    /**
-     * All connections
-     */
-    public readonly connections: {
-        /**
-         * Connection name
-         */
-        name: string,
-        /**
-         * Connection sequelize
-         */
-        sequelize: Sequelize
-    }[] = [];
 
     /**
      * Controllers loaded
@@ -564,9 +549,7 @@ export default class Server {
                                     const schemaItem = schema[key];
 
                                     if(schemaItem) {
-                                        if(schemaItem.body) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.body, "body"));
-                                        if(schemaItem.query) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.query, "query"));
-                                        if(schemaItem.params) requestHandlersEnque.unshift(schemaMiddleware(schemaItem.params, "params"));
+                                        requestHandlersEnque.unshift(schemaMiddleware(schemaItem));
                                     }
                                 }
                             }

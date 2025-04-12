@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
-import httpStatus from "@stexcore/http-status";
+import { badRequest } from "@stexcore/http-status";
+import { ISchemaRequest } from "../types/types";
 import Joi from "joi";
 
 /**
@@ -8,18 +9,29 @@ import Joi from "joi";
  * @param access Access to property
  * @returns Request handler
  */
-export default function schemaMiddleware(schema: Joi.ObjectSchema, access: "params" | "body" | "query"): RequestHandler {
+export default function schemaMiddleware(schema: ISchemaRequest): RequestHandler {
 
+    // Create a schema to validate
+    const composeSchema = Joi.object({
+        ...(schema.query    && {query: schema.query}),
+        ...(schema.params   && {params: schema.params}),
+        ...(schema.body     && {body: schema.body}),
+    });
+    
     // Make request handler
     return (req, _res, next) => {
         try {
             // Validate schema with joi
-            const resultValidation = schema.validate(req[access], { abortEarly: false });
+            const resultValidation = composeSchema.validate({
+                ...(schema.query    && {query: req.query}),
+                ...(schema.params   && {params: req.params}),
+                ...(schema.body     && {body: req.body}),
+            }, { abortEarly: false });
 
             if(resultValidation.error) {
                 // Throw error
                 next(
-                    httpStatus.badRequest(resultValidation.error.message)
+                    badRequest(resultValidation.error.message, resultValidation.error.details)
                 );
             }
             else {

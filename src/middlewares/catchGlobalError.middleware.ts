@@ -1,5 +1,5 @@
 import { ErrorRequestHandler } from "express";
-import httpStatus from "@stexcore/http-status";
+import { internalServerError } from "@stexcore/http-status";
 
 /**
  * Catch a global error
@@ -10,7 +10,7 @@ import httpStatus from "@stexcore/http-status";
  */
 const catchGlobalErrorMiddleware: ErrorRequestHandler = (_err, _req, res, next) => {
     try {
-        res.json(httpStatus.internalServerError());
+        res.status(500).json(internalServerError());
     }
     catch(err) {
         next(err);
