@@ -60,6 +60,11 @@ export interface ISchemaRequest {
     body?: ObjectSchema,
 
     /**
+     * Headers schema. This headers is received into headers request incomming
+     */
+    headers?: ObjectSchema,
+
+    /**
      * Query schema. This query is received into searchParams by path. Sample path:
      * 
      * ```javascript

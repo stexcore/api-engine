@@ -16,6 +16,7 @@ export default function schemaMiddleware(schema: ISchemaRequest): RequestHandler
         ...(schema.query    && {query: schema.query}),
         ...(schema.params   && {params: schema.params}),
         ...(schema.body     && {body: schema.body}),
+        ...(schema.headers     && {headers: schema.headers}),
     });
     
     // Make request handler
@@ -26,6 +27,7 @@ export default function schemaMiddleware(schema: ISchemaRequest): RequestHandler
                 ...(schema.query    && {query: req.query}),
                 ...(schema.params   && {params: req.params}),
                 ...(schema.body     && {body: req.body}),
+                ...(schema.headers     && {headers: req.headers}),
             }, { abortEarly: false });
 
             if(resultValidation.error) {
