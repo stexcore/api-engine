@@ -16,7 +16,7 @@ export default function schemaMiddleware(schema: ISchemaRequest): RequestHandler
         ...(schema.query    && {query: schema.query}),
         ...(schema.params   && {params: schema.params}),
         ...(schema.body     && {body: schema.body}),
-        ...(schema.headers     && {headers: schema.headers}),
+        ...(schema.headers     && {headers: schema.headers.unknown(true)}),
     });
     
     // Make request handler
