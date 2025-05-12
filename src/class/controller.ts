@@ -1,16 +1,10 @@
-import { RequestHandler } from "express";
-import Server from "../server";
+import type { RequestHandler } from "express";
+import Piece from "./piece";
 
 /**
  * Structure base of controller
  */
-export default class Controller {
-
-    /**
-     * Initialize controller
-     * @param server Server instance
-     */
-    constructor(public readonly server: Server) {}
+export default class Controller extends Piece {
 
     /**
      * Handle request incomming with method 'GET'

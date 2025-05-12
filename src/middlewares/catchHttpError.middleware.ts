@@ -1,4 +1,4 @@
-import { ErrorRequestHandler } from "express";
+import type { ErrorRequestHandler } from "express";
 import { isHttpError } from "@stexcore/http-status";
 
 /**

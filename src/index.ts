@@ -1,8 +1,8 @@
-import { ISchema, IServerConfig } from "./types/types";
+import type { ISchema, IServerConfig } from "./types/types";
 import Server from "./server";
+import Schema from "./class/schema";
 import Controller from "./class/controller";
 import Service from "./class/service";
-import Schema from "./class/schema";
 
 /**
  * Create an instance server core

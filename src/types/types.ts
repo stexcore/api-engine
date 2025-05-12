@@ -1,4 +1,4 @@
-import { ObjectSchema } from "joi";
+import type { ObjectSchema } from "joi";
 
 /**
  * Methods HTTP

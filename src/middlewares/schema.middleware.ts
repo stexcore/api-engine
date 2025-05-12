@@ -1,6 +1,6 @@
-import { RequestHandler } from "express";
+import type { RequestHandler } from "express";
+import type { ISchemaRequest } from "../types/types";
 import { badRequest } from "@stexcore/http-status";
-import { ISchemaRequest } from "../types/types";
 import Joi from "joi";
 
 /**

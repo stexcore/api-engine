@@ -1,4 +1,4 @@
-import { ISchema, ISchemaRequest } from "../types/types";
+import type { ISchema, ISchemaRequest } from "../types/types";
 
 /**
  * Schema validation

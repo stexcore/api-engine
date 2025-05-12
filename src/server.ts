@@ -1,7 +1,7 @@
-import { IMethod, ISchema, ISegment, IServerConfig } from "./types/types";
+import type { IMethod, ISchema, ISegment, IServerConfig } from "./types/types";
+import express, { type Request, type RequestHandler, type Response } from "express";
 import Controller from "./class/controller";
 import Service from "./class/service";
-import express, { Request, RequestHandler, Response } from "express";
 import path from "path";
 import http from "http";
 import fs from "fs";

@@ -1,15 +1,9 @@
-import Server from "../server";
+import Piece from "./piece";
 
 /**
  * Service instance
  */
-export default class Service {
-
-    /**
-     * Initialize service
-     * @param server Server instance
-     */
-    constructor(public readonly server: Server) {}
+export default class Service extends Piece {
 
     /**
      * Initialize service operation. (It's called when the server is initialized)
