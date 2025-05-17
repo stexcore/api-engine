@@ -3,6 +3,7 @@ import Server from "./server";
 import Schema from "./class/schema";
 import Controller from "./class/controller";
 import Service from "./class/service";
+import Piece from "./class/piece";
 
 /**
  * Create an instance server core
@@ -41,6 +42,8 @@ export {
     Controller,
     // Service class
     Service,
+    // Piece class
+    Piece,
     // Create server
     createServer,
     // Create schema
