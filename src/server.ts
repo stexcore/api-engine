@@ -32,7 +32,7 @@ export default class Server {
     /**
      * Workdir to work
      */
-    protected workdir: string
+    public readonly workdir: string
 
     /**
      * All services 
@@ -219,15 +219,11 @@ export default class Server {
             console.log("");
 
             // Load all services
-            await this.loadServices();
             // Load all middlewares
-            await this.loadMiddlewares();
             // Append handler
             this.appendHandler();
             // Load all schemas
-            await this.loadSchemas();
             // Load all controllers
-            await this.loadControllers();
         }
         catch(err) {
             console.error(err);
@@ -247,229 +243,6 @@ export default class Server {
             // Set catch errors middleware
             this.app.use(catchHttpErrorMiddleware);
             this.app.use(catchHttpErrorMiddleware);
-        }
-    }
-
-    /**
-     * Load services
-     */
-    private async loadServices() {
-        // Read service files
-        const dir = path.join(this.workdir, "services");
-        const serviceFiles = fs.readdirSync(dir);
-        const servicesLoaded: Service[] = [];
-
-        // Earch services
-        for(const serviceFileItem of serviceFiles) {
-            // Get service name
-            const serviceName = serviceFileItem.slice(0, -3);
-
-            // Validate nomenclature
-            if(serviceFileItem.endsWith(".service.ts") || serviceFileItem.endsWith(".service.js")) {
-                try {
-                    // import module
-                    const service = await import(path.join(dir, serviceFileItem))
-                    // Validate module
-                    if(service.default?.prototype instanceof Service) {
-    
-                        // Register service
-                        const serviceInstance = this.registerService(service.default)
-                        servicesLoaded.push(serviceInstance);
-    
-                        // Log service loaded
-                        console.log("✅ Service loaded:    /" + serviceName);
-                    }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load service:    /" + serviceName);
-                }
-            }
-        }
-
-        return servicesLoaded;
-    }
-
-    /**
-     * Load middlewares
-     * @returns Middlewares loaded
-     */
-    private async loadMiddlewares(segments: string[]= []) {
-        // Workdir
-        const dir = path.join(this.workdir, "middlewares", ...segments);
-        // Read middlewares files
-        const middlewaresFiles = fs.readdirSync(dir);
-        // Middlewares loaded
-        const middlewaresLoaded: RequestHandler[] = [];
-
-        // Traverse middlewares
-        for(const middlewareFileItem of middlewaresFiles) {
-            // Get middleware name
-            const middlewareName = middlewareFileItem.slice(0, -3);
-            // Path middleware
-            const pathMiddleware = "/" + segments.join("/");
-
-            // Validate nomenclature declaration
-            if(middlewareFileItem.endsWith("middleware.ts") || middlewareFileItem.endsWith("middleware.js")) {
-                try {
-                    // Import module
-                    const moduleItem = await import(path.join(dir, middlewareFileItem));
-
-                    if(moduleItem.default instanceof Function) {
-
-                        // Append middlewares loaded
-                        this.middlewaresLoaded.push({
-                            path: pathMiddleware,
-                            middleware: moduleItem.default
-                        });
-
-                        // Append middleware loaded
-                        middlewaresLoaded.push(moduleItem.default);
-
-                        // Log middleware loaded
-                        console.log("✅ Middleware loaded: " + ([pathMiddleware.replace(/^\//g, ""), middlewareName].join("/")));
-                    }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load the middleware: " + ([pathMiddleware, middlewareName].join("/")));
-                }
-            }
-            else {
-                // Get middlewares loaded
-                const subMiddlewaresLoaded = await this.loadMiddlewares([...segments, middlewareFileItem]);
-
-                // Append middlewares loaded
-                middlewaresLoaded.push(...subMiddlewaresLoaded);
-            }
-        }
-
-        // Middlewares loaded
-        return middlewaresLoaded;
-    }
-
-    /**
-     * Load schemas
-     * @returns Schemas loaded
-     */
-    private async loadSchemas() {
-        // Workdir
-        const dir = path.join(this.workdir, "schemas");
-        // Read schemas files
-        const schemasFiles = fs.readdirSync(dir);
-        // Schemas loaded
-        const schemasLoaded: Schema[] = [];
-
-        // Traverse schemas
-        for(const schemaFileItem of schemasFiles) {
-            // Get schemas name
-            const schemaName = schemaFileItem.slice(0, -3);
-            // path schema
-            const pathSchema = "/" + schemaName.slice(0, -7).split(".").join("/");
-
-            // Validate nomenclature declaration
-            if(schemaFileItem.endsWith("schema.ts") || schemaFileItem.endsWith("schema.js")) {
-                try {
-                    // Import module
-                    const moduleItem = await import(path.join(dir, schemaFileItem));
-
-                    if(moduleItem.default instanceof Schema) {
-                        // schema instance
-                        const schemaItem = moduleItem.default;
-
-                        // Append schema loaded
-                        this.schemasLoaded.push({
-                            path: pathSchema,
-                            schema: schemaItem
-                        });
-
-                        // Append schema loaded
-                        schemasLoaded.push(schemaItem);
-                        
-                        // Log schema loaded!
-                        console.log("✅ Schema loaded:     " + pathSchema);
-                    }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load the schema     " + pathSchema);
-                }
-            }
-        }
-
-        // schemas loaded
-        return schemasLoaded;
-    }
-    
-    /**
-     * Load controllers
-     * @returns controller loaded
-     */
-    private async loadControllers() {
-        // Read controller files
-        const dir = path.join(this.workdir, "controllers");
-        // Controller files
-        const controllerFiles = fs.readdirSync(dir);
-        // COntrollers loaded
-        const controllerLoaded: Controller[] = [];
-
-        // load controllers
-        for(const controllerFileItem of controllerFiles) {
-
-            // Validate nomenclature file
-            if(controllerFileItem.endsWith("controller.ts") || controllerFileItem.endsWith("controller.js")) {
-                // remove controller.js/ts nomenclature
-                const controllerName = controllerFileItem.slice(0, -3);
-                const segmentsFile = controllerName.slice(0, -11).split(".");
-                const segments: ISegment[] = [];
-    
-                // travese array of segments
-                segmentsFile.forEach((segmentFileItem) => {
-                    // Validate segment dynamic?
-                    if(segmentFileItem.startsWith("[") && segmentFileItem.endsWith("]")) {
-                        // Append segment dynamic
-                        segments.push({ type: "dynamic", param: segmentFileItem.slice(1, -1) });
-                    }
-                    else {
-                        // Append segment static
-                        segments.push({ type: "static", segment: segmentFileItem });
-                    }
-                });
-
-                // path controller
-                const pathController = "/" + segments.map(s => s.type === "static" ? s.segment : `[${s.param}]`).join("/");
-
-                try {
-                    // Import module
-                    const moduleItem = await import(path.join(dir, controllerFileItem));
-    
-                    // Validate module instance of Controller
-                    if(moduleItem.default?.prototype instanceof Controller) {
-
-                        // Create controller instance
-                        const controller = new moduleItem.default(this);
-                            
-                        // Append controller loaded
-                        this.controllersLoaded.push({
-                            type: segments.some((s) => s.type === "dynamic") ? "dynamic" : "static",
-                            path: pathController,
-                            segments: segments,
-                            controller: controller
-                        });
-
-                        // Append controller loaded
-                        controllerLoaded.push(controller);
-
-                        // Log controller loaded
-                        console.log("✅ Controller loaded: " + pathController);
-    
-                    }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load the controller: " + pathController);
-                }
-            }
         }
     }
 
@@ -544,13 +317,10 @@ export default class Server {
                                 // Extract schema
                                 const { schema } = schemaInformation;
 
-                                for(const keyname in schema) {
-                                    const key = keyname as keyof ISchema;
-                                    const schemaItem = schema[key];
+                                const schemaItem = schema[method];
 
-                                    if(schemaItem) {
-                                        requestHandlersEnque.unshift(schemaMiddleware(schemaItem));
-                                    }
+                                if(schemaItem) {
+                                    requestHandlersEnque.unshift(schemaMiddleware(schemaItem));
                                 }
                             }
 
