@@ -15,13 +15,13 @@ export default class TreeLoader extends Loader<ITree> {
      * @param tree Tree information
      * @returns Tree information
      */
-    public async load(nomenclature: string = "tree", mode: "tree" | "compact" = "tree"): Promise<ITree> {
+    public async load(dir: string = this.server.workdir, nomenclature: string = "tree", mode: "tree" | "compact" = "tree"): Promise<ITree> {
         switch(mode) {
             case "tree":
-                return this.loadTree(nomenclature, this.server.workdir);
+                return this.loadTree(nomenclature, dir);
 
             case "compact":
-                return this.loadFlat(nomenclature, this.server.workdir);
+                return this.loadFlat(nomenclature, dir);
 
             default:
                 throw new Error("Unknow type to load resources");
@@ -54,7 +54,7 @@ export default class TreeLoader extends Loader<ITree> {
 
             if(stat.isDirectory()) {
                 // Get subtree
-                const subTree = await this.loadTree(nomenclature, fileDir, [...segments, filename]);
+                const subTree = await this.loadTree(nomenclature, dir_base, [...segments, filename]);
 
                 // Set paths
                 paths.push(...subTree.paths);
@@ -63,17 +63,20 @@ export default class TreeLoader extends Loader<ITree> {
                 const regexp = new RegExp(".*\\." + nomenclature + ".[ts|js]");
 
                 if(regexp.test(filename)) {
+                    const segmentsInfo = segments.map((segmentItem) => ({
+                        name: segmentItem,
+                        dynamic: segmentItem.startsWith("[") && segmentItem.endsWith("]")
+                    }));
+                    
                     // Append file access
                     paths.push({
                         absolute: fileDir,
                         relative: relativeDir,
                         filename: filename,
+                        mimetype: mime.lookup(fileDir) || "application/octet-stream",
                         bytes: stat.size,
-                        segments: segments.map((segmentItem) => ({
-                            name: segmentItem,
-                            dynamic: segmentItem.startsWith("[") && segmentItem.endsWith("]")
-                        })),
-                        mimetype: mime.lookup(fileDir) || "application/octet-stream"
+                        flat_segments: segmentsInfo.map((sItem) => sItem.name).join("/"),
+                        segments: segmentsInfo
                     });
                 }
                 else throw new Error("❌ The " + nomenclature + " '" + relativeDir + "' is'nt allowed!");
@@ -123,17 +126,21 @@ export default class TreeLoader extends Loader<ITree> {
                     // Append segments
                     const segments = filename_without_nomenclature.split(".");
 
+                    // segments info
+                    const segmentsinfo = segments.map((segmentItem) => ({
+                        name: segmentItem,
+                        dynamic: segmentItem.startsWith("[") && segmentItem.endsWith("]")
+                    }))
+                    
                     // Append file access
                     paths.push({
                         absolute: fileDir,
                         relative: relativeDir,
                         filename: filename,
+                        mimetype: mime.lookup(fileDir) || "application/octet-stream",
                         bytes: stat.size,
-                        segments: segments.map((segmentItem) => ({
-                            name: segmentItem,
-                            dynamic: segmentItem.startsWith("[") && segmentItem.endsWith("]")
-                        })),
-                        mimetype: mime.lookup(fileDir) || "application/octet-stream"
+                        flat_segments: segmentsinfo.map((sItem) => sItem.name).join("/"),
+                        segments: segmentsinfo
                     });
                 }
                 else throw new Error("❌ The " + nomenclature + " '" + relativeDir + "' is'nt allowed!");

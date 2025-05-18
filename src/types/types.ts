@@ -133,6 +133,7 @@ export interface IRouteFile {
     filename: string,
     mimetype: string,
     bytes: number
+    flat_segments: string,
     segments: ISegmentFile[]
 }
 

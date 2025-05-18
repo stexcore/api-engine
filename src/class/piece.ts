@@ -1,4 +1,4 @@
-import type Server from "../server";
+import type Server from "../server/server";
 import type Service from "./service";
 
 /**
