@@ -121,3 +121,22 @@ export interface ISchema {
     OPTIONS?: ISchemaRequest;
     
 }
+
+export interface ISegmentFile {
+    dynamic: boolean,
+    name: string,
+}
+
+export interface IRouteFile {
+    relative: string,
+    absolute: string,
+    filename: string,
+    mimetype: string,
+    bytes: number
+    segments: ISegmentFile[]
+}
+
+export interface ITree {
+    base: string,
+    paths: IRouteFile[],
+}
