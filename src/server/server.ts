@@ -3,6 +3,7 @@ import express from "express";
 import Service from "../class/service";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
+import MiddlewaresLoader from "../core/middlewares.loader";
 
 /**
  * Server instance
@@ -176,11 +177,17 @@ export default class Server {
                 };
 
                 const servicesLoader = new ServicesLoader(this);
+                const middlewaresLoader = new MiddlewaresLoader(this);
 
-                Promise.all([
-                    servicesLoader.load()
-                ])
-                    .then(() => {
+                servicesLoader.load()
+                    .then((servicesConstructors) => {
+                        this.registerService(servicesConstructors);
+
+                        return middlewaresLoader.load();
+                    })
+                    .then((middlewares) => {
+                        console.log(middlewares);
+                        
                         // Apply start server
                         startServer();
                     })

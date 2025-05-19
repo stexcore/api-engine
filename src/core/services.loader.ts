@@ -7,7 +7,7 @@ import Server from "../server/server";
 /**
  * Services loader
  */
-export default class ServicesLoader extends Loader<Service[]> {
+export default class ServicesLoader extends Loader<(new (server: Server) => Service)[]> {
 
     /**
      * Service directory
@@ -23,11 +23,9 @@ export default class ServicesLoader extends Loader<Service[]> {
      * Load all services into workdir
      * @returns All controllers
      */
-    public async load(): Promise<Service[]> {
+    public async load(): Promise<(new (server: Server) => Service)[]> {
         // Load tree info
         const tree = await this.treeLoader.load(this.services_dir, "service", "compact");
-        // Services loaded
-        const servicesLoaded: Service[] = [];
 
         // Load constructors
         const serviceConstructors: (new (server: Server) => Service)[] = [];
@@ -55,10 +53,7 @@ export default class ServicesLoader extends Loader<Service[]> {
             })
         );
 
-        // Register services
-        this.server.registerService(serviceConstructors)
-
-        return servicesLoaded;
+        return serviceConstructors;
     }
     
 }
