@@ -1,7 +1,8 @@
 import path from "path";
-import fs from "fs";
 import Loader from "../class/loader";
 import Service from "../class/service";
+import TreeLoader from "./tree.loader";
+import Server from "../server/server";
 
 /**
  * Services loader
@@ -11,44 +12,51 @@ export default class ServicesLoader extends Loader<Service[]> {
     /**
      * Service directory
      */
-    private services_dir = path.join(this.server.workdir, "services");
+    private services_dir: string = path.join(this.server.workdir, "services");
+    
+    /**
+     * tree loader
+     */
+    private treeLoader = new TreeLoader(this.server);
     
     /**
      * Load all services into workdir
      * @returns All controllers
      */
     public async load(): Promise<Service[]> {
-        // Read service files
-        const serviceFiles = fs.readdirSync(this.services_dir);
+        // Load tree info
+        const tree = await this.treeLoader.load(this.services_dir, "service", "compact");
+        // Services loaded
         const servicesLoaded: Service[] = [];
 
-        // Earch services
-        for(const serviceFileItem of serviceFiles) {
-            // Get service name
-            const serviceName = serviceFileItem.slice(0, -3);
-
-            // Validate nomenclature
-            if(serviceFileItem.endsWith(".service.ts") || serviceFileItem.endsWith(".service.js")) {
+        // Load constructors
+        const serviceConstructors: (new (server: Server) => Service)[] = [];
+        
+        await Promise.all(
+            tree.paths.map(async (serviceFileItem) => {
                 try {
-                    // import module
-                    const service = await import(path.join(this.services_dir, serviceFileItem))
-                    // Validate module
-                    if(service.default?.prototype instanceof Service) {
-    
-                        // Register service
-                        const serviceInstance = this.server.registerService(service.default)
-                        servicesLoaded.push(serviceInstance);
-    
-                        // Log service loaded
-                        console.log("✅ Service loaded:    /" + serviceName);
+                    // Load module service
+                    const moduleService = await import(serviceFileItem.absolute);
+
+                    // Validate service valid
+                    if(moduleService.default?.prototype instanceof Service) {
+                        Object.defineProperty(moduleService.default, "name", {
+                            writable: true
+                        });
+                        moduleService.default.name = serviceFileItem.filename;
+                        serviceConstructors.push(moduleService.default);
                     }
+                    else console.log("⚠️  Invalid service:   /" + serviceFileItem.filename);
                 }
-                catch(e) {
-                    console.debug(e);
-                    console.log("❌ Failed to load service:    /" + serviceName);
+                catch(err) {
+                    console.log(err);
+                    throw new Error("❌ Failed to load service:    /" + serviceFileItem.filename);
                 }
-            }
-        }
+            })
+        );
+
+        // Register services
+        this.server.registerService(serviceConstructors)
 
         return servicesLoaded;
     }

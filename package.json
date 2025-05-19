@@ -11,7 +11,8 @@
     "url": "https://github.com/stexcore/api-engine.git"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "ts-node ./test/test.ts"
   },
   "engines": {
     "javascript": ">=2016"
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.17",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
   },
   "dependencies": {
