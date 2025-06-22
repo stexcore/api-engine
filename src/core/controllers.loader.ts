@@ -3,6 +3,8 @@ import Loader from "../class/loader";
 import path from "path";
 import fs from "fs";
 import { ISegment } from "../types/types";
+import TreeLoader from "./tree.loader";
+import Server from "../server/server";
 
 /**
  * Controllers loader
@@ -15,75 +17,58 @@ export default class ControllersLoader extends Loader<Controller[]> {
     private controllers_dir = path.join(this.server.workdir, "controllers");
     
     /**
+     * Tree loader
+     */
+    private treeLoader = new TreeLoader(this.server);
+    
+    
+    /**
      * Load controllers
-     * @returns controller loaded
+     * @returns controllers loaded
      */
     public async load(): Promise<Controller[]> {
-        // Controller files
-        const controllerFiles = fs.readdirSync(this.controllers_dir);
-        // COntrollers loaded
-        const controllerLoaded: Controller[] = [];
 
-        // load controllers
-        for(const controllerFileItem of controllerFiles) {
+        // Load tree info
+        const tree = await this.treeLoader.load(this.controllers_dir, "controller", "compact");
 
-            // Validate nomenclature file
-            if(controllerFileItem.endsWith("controller.ts") || controllerFileItem.endsWith("controller.js")) {
-                // remove controller.js/ts nomenclature
-                const controllerName = controllerFileItem.slice(0, -3);
-                const segmentsFile = controllerName.slice(0, -11).split(".");
-                const segments: ISegment[] = [];
-    
-                // travese array of segments
-                segmentsFile.forEach((segmentFileItem) => {
-                    // Validate segment dynamic?
-                    if(segmentFileItem.startsWith("[") && segmentFileItem.endsWith("]")) {
-                        // Append segment dynamic
-                        segments.push({ type: "dynamic", param: segmentFileItem.slice(1, -1) });
-                    }
-                    else {
-                        // Append segment static
-                        segments.push({ type: "static", segment: segmentFileItem });
-                    }
-                });
-
-                // path controller
-                const pathController = "/" + segments.map(s => s.type === "static" ? s.segment : `[${s.param}]`).join("/");
-
+        // Load constructors
+        const controllersConstructors: (new (server: Server) => Controller)[] = [];
+        
+        await Promise.all(
+            tree.paths.map(async (controllerFileItem) => {
                 try {
-                    // Import module
-                    const moduleItem = await import(path.join(this.controllers_dir, controllerFileItem));
-    
-                    // Validate module instance of Controller
-                    if(moduleItem.default?.prototype instanceof Controller) {
+                    // Load module controller
+                    const moduleController = await import(controllerFileItem.absolute);
 
-                        // Create controller instance
-                        const controller = new moduleItem.default(this);
-                            
-                        // Append controller loaded
-                        // this.controllersLoaded.push({
-                        //     type: segments.some((s) => s.type === "dynamic") ? "dynamic" : "static",
-                        //     path: pathController,
-                        //     segments: segments,
-                        //     controller: controller
-                        // });
+                    let controller: (new (server: Server) => Controller) | undefined;
 
-                        // Append controller loaded
-                        controllerLoaded.push(controller);
-
-                        // Log controller loaded
-                        console.log("✅ Controller loaded: " + pathController);
-    
+                    // Validate controller valid
+                    if(moduleController.default?.prototype instanceof Controller) {
+                        Object.defineProperty(moduleController.default, "name", {
+                            writable: true
+                        });
+                        moduleController.default.name = controllerFileItem.filename;
+                        controller = moduleController.default;
                     }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load the controller: " + pathController);
-                }
-            }
-        }
 
-        return [];
+                    if(controller) {
+                        controllersConstructors.push(controller);
+                    }
+                    else console.log("⚠️  Invalid controller:   /" + controllerFileItem.filename)
+                }
+                catch(err) {
+                    console.log(err);
+                    throw new Error("❌ Failed to load controller:    /" + controllerFileItem.filename);
+                }
+            })
+        );
+
+        // Create controllers
+        const controllersLoaded: Controller[] = controllersConstructors.map((controllerConstructorItem) => (
+            new controllerConstructorItem(this.server)
+        ));
+
+        return controllersLoaded;
     }
     
 }
