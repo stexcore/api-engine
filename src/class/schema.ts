@@ -1,3 +1,4 @@
+import Joi from "joi";
 import type { ISchema, ISchemaRequest } from "../types/types";
 
 /**
@@ -5,6 +6,11 @@ import type { ISchema, ISchemaRequest } from "../types/types";
  */
 export default class Schema implements ISchema {
 
+    /**
+     * Utilidades Joi
+     */
+    public readonly joi = Joi;
+    
     /**
      * Schema validation to method 'GET'
      */

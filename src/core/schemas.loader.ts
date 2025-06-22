@@ -2,59 +2,67 @@ import path from "path";
 import fs from "fs";
 import Loader from "../class/loader";
 import Schema from "../class/schema";
+import TreeLoader from "./tree.loader";
+import Server from "../server/server";
 
 export default class SchemasLoader extends Loader<Schema[]> {
 
+    /**
+     * Schemas Directory
+     */
     private schemas_dir = path.join(this.server.workdir, "schemas");
+    
+    /**
+     * Tree loader
+     */
+    private treeLoader = new TreeLoader(this.server);
     
     /**
      * Load schemas
      * @returns Schemas loaded
      */
     public async load(): Promise<Schema[]> {
-        // Read schemas files
-        const schemasFiles = fs.readdirSync(this.schemas_dir);
-        // Schemas loaded
-        const schemasLoaded: Schema[] = [];
 
-        // Traverse schemas
-        for(const schemaFileItem of schemasFiles) {
-            // Get schemas name
-            const schemaName = schemaFileItem.slice(0, -3);
-            // path schema
-            const pathSchema = "/" + schemaName.slice(0, -7).split(".").join("/");
+        // Load tree info
+        const tree = await this.treeLoader.load(this.schemas_dir, "schema", "compact");
 
-            // Validate nomenclature declaration
-            if(schemaFileItem.endsWith("schema.ts") || schemaFileItem.endsWith("schema.js")) {
+        // Load constructors
+        const schemasConstructors: (new (server: Server) => Schema)[] = [];
+        
+        await Promise.all(
+            tree.paths.map(async (schemaFileItem) => {
                 try {
-                    // Import module
-                    const moduleItem = await import(path.join(this.schemas_dir, schemaFileItem));
+                    // Load module schema
+                    const moduleSchema = await import(schemaFileItem.absolute);
 
-                    if(moduleItem.default instanceof Schema) {
-                        // schema instance
-                        const schemaItem = moduleItem.default;
+                    let schema: (new (server: Server) => Schema) | undefined;
 
-                        // Append schema loaded
-                        // this.schemasLoaded.push({
-                        //     path: pathSchema,
-                        //     schema: schemaItem
-                        // });
-
-                        // Append schema loaded
-                        schemasLoaded.push(schemaItem);
-                        
-                        // Log schema loaded!
-                        console.log("✅ Schema loaded:     " + pathSchema);
+                    // Validate schema valid
+                    if(moduleSchema.default?.prototype instanceof Schema) {
+                        Object.defineProperty(moduleSchema.default, "name", {
+                            writable: true
+                        });
+                        moduleSchema.default.name = schemaFileItem.filename;
+                        schema = moduleSchema.default;
                     }
-                }
-                catch(e) {
-                    console.log(e);
-                    console.log("❌ Failed to load the schema     " + pathSchema);
-                }
-            }
-        }
 
-        // schemas loaded
+                    if(schema) {
+                        schemasConstructors.push(schema);
+                    }
+                    else console.log("⚠️  Invalid schema:   /" + schemaFileItem.filename)
+                }
+                catch(err) {
+                    console.log(err);
+                    throw new Error("❌ Failed to load schema:    /" + schemaFileItem.filename);
+                }
+            })
+        );
+
+        // Create schemas
+        const schemasLoaded: Schema[] = schemasConstructors.map((schemaConstructorItem) => (
+            new schemaConstructorItem(this.server)
+        ));
+
         return schemasLoaded;
     }
 

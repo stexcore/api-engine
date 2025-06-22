@@ -4,6 +4,7 @@ import Service from "../class/service";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
 import MiddlewaresLoader from "../core/middlewares.loader";
+import SchemasLoader from "../core/schemas.loader";
 
 /**
  * Server instance
@@ -178,6 +179,7 @@ export default class Server {
 
                 const servicesLoader = new ServicesLoader(this);
                 const middlewaresLoader = new MiddlewaresLoader(this);
+                const schemasLoader = new SchemasLoader(this);
 
                 servicesLoader.load()
                     .then((servicesConstructors) => {
@@ -188,6 +190,11 @@ export default class Server {
                     .then((middlewares) => {
                         console.log(middlewares);
                         
+                        return schemasLoader.load();
+                    })
+                    .then((schemas) => {
+                        console.log(schemas);
+    
                         // Apply start server
                         startServer();
                     })
