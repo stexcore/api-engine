@@ -1,0 +1,41 @@
+{
+  "material-icon-theme.files.associations": {
+
+    // Typescript
+    "*.controller.ts": "ngrx-entity",
+    "controller.ts": "ngrx-entity",
+    "*.middleware.ts": "ngrx-actions",
+    "middleware.ts": "ngrx-actions",
+    "*.pipe.ts": "ngrx-state",
+    "pipe.ts": "ngrx-state",
+    "*.schema.ts": "ngrx-reducer",
+    "schema.ts": "ngrx-reducer",
+    "*.service.ts": "ngrx-selectors",
+    "service.ts": "ngrx-selectors",
+    "*.loader.ts": "settings",
+    "loader.ts": "settings",
+    "*.config.ts": "ngrx-selectors",
+    "config.ts": "ngrx-selectors",
+    "piece.ts": "controller",
+
+    // Javascript
+    "*.controller.js": "ngrx-entity",
+    "controller.js": "ngrx-entity",
+    "*.middleware.js": "ngrx-actions",
+    "middleware.js": "ngrx-actions",
+    "*.pipe.js": "ngrx-state",
+    "pipe.js": "ngrx-state",
+    "*.schema.js": "ngrx-reducer",
+    "schema.js": "ngrx-reducer",
+    "*.service.js": "ngrx-selectors",
+    "service.js": "ngrx-selectors",
+    "*.loader.js": "settings",
+    "loader.js": "settings",
+    "*.config.js": "ngrx-selectors",
+    "config.js": "ngrx-selectors",
+    "piece.js": "controller",
+  },
+  "material-icon-theme.folders.associations": {
+    "services": "custom"
+  }
+}

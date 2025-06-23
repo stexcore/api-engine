@@ -4,6 +4,7 @@ import Schema from "./class/schema";
 import Controller from "./class/controller";
 import Service from "./class/service";
 import Piece from "./class/piece";
+import Pipe from "./class/pipe";
 
 /**
  * Create an instance server core
@@ -44,8 +45,10 @@ export {
     Service,
     // Piece class
     Piece,
+    // Pipe class
+    Pipe,
     // Create server
     createServer,
     // Create schema
-    createSchema
+    createSchema,
 };
