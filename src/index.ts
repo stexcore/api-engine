@@ -1,10 +1,11 @@
 import type { ISchema, IServerConfig } from "./types/types";
-import Server from "./server";
+import Server from "./server/server";
 import Schema from "./class/schema";
 import Controller from "./class/controller";
 import Service from "./class/service";
 import Piece from "./class/piece";
 import Pipe from "./class/pipe";
+import Middleware from "./class/middleware";
 
 /**
  * Create an instance server core
@@ -47,6 +48,8 @@ export {
     Piece,
     // Pipe class
     Pipe,
+    // Middleware
+    Middleware,
     // Create server
     createServer,
     // Create schema

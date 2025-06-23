@@ -1,6 +1,6 @@
 {
   "name": "@stexcore/api-engine",
-  "version": "2.0.0-alpha.2",
+  "version": "2.0.0-alpha.3",
   "description": "Core for rapidly developing an API using Express under the hood",
   "main": "dist/index.js",
   "bugs": {
