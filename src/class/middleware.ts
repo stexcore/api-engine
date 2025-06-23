@@ -1,12 +1,5 @@
-import type { ErrorRequestHandler, RequestHandler } from "express";
-import Piece from "./piece";
-
-/**
- * Request handler
- */
-export type IMiddewareHandler =
-    | RequestHandler
-    | RequestHandler[];
+import type { ErrorRequestHandler } from "express";
+import Pipe from "./pipe";
 
 /**
  * Error request handler
@@ -18,12 +11,7 @@ export type IMiddlewareError =
 /**
  * Structure base of middleware 
  */
-export default abstract class Middleware extends Piece {
-
-    /**
-     * Request handler
-     */
-    public readonly abstract handler: IMiddewareHandler;
+export default abstract class Middleware extends Pipe {
 
     /**
      * Error request handlers

@@ -2,14 +2,14 @@ import Controller from "../class/controller";
 import Loader from "../class/loader";
 import path from "path";
 import fs from "fs";
-import { ISegment } from "../types/types";
+import { IRouteFile, ISegment } from "../types/types";
 import TreeLoader from "./tree.loader";
 import Server from "../server/server";
 
 /**
  * Controllers loader
  */
-export default class ControllersLoader extends Loader<Controller[]> {
+export default class ControllersLoader extends Loader<{ controller: Controller, route: IRouteFile }[]> {
     
     /**
      * Load controllers
@@ -26,13 +26,16 @@ export default class ControllersLoader extends Loader<Controller[]> {
      * Load controllers
      * @returns controllers loaded
      */
-    public async load(): Promise<Controller[]> {
+    public async load(): Promise<{ controller: Controller, route: IRouteFile }[]> {
 
         // Load tree info
         const tree = await this.treeLoader.load(this.controllers_dir, "controller", "compact");
 
         // Load constructors
-        const controllersConstructors: (new (server: Server) => Controller)[] = [];
+        const controllersConstructors: {
+            constructor: (new (server: Server) => Controller),
+            route: IRouteFile
+        }[] = [];
         
         await Promise.all(
             tree.paths.map(async (controllerFileItem) => {
@@ -52,7 +55,10 @@ export default class ControllersLoader extends Loader<Controller[]> {
                     }
 
                     if(controller) {
-                        controllersConstructors.push(controller);
+                        controllersConstructors.push({
+                            constructor: controller,
+                            route: controllerFileItem
+                        });
                     }
                     else console.log("⚠️  Invalid controller:   /" + controllerFileItem.filename)
                 }
@@ -64,9 +70,13 @@ export default class ControllersLoader extends Loader<Controller[]> {
         );
 
         // Create controllers
-        const controllersLoaded: Controller[] = controllersConstructors.map((controllerConstructorItem) => (
-            new controllerConstructorItem(this.server)
-        ));
+        const controllersLoaded: {
+            controller: Controller,
+            route: IRouteFile
+        }[] = controllersConstructors.map((controllerConstructorItem) => ({
+            controller: new controllerConstructorItem.constructor(this.server),
+            route: controllerConstructorItem.route
+        }));
 
         return controllersLoaded;
     }

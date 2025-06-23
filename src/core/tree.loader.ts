@@ -76,6 +76,7 @@ export default class TreeLoader extends Loader<ITree> {
                         mimetype: mime.lookup(fileDir) || "application/octet-stream",
                         bytes: stat.size,
                         flat_segments: segmentsInfo.map((sItem) => sItem.name).join("/"),
+                        flat_segments_express: segmentsInfo.map((sItem) => sItem.name).join("/"),
                         segments: segmentsInfo
                     });
                 }
@@ -120,17 +121,21 @@ export default class TreeLoader extends Loader<ITree> {
                 const regexp = new RegExp(".*\\." + nomenclature + ".[ts|js]");
 
                 if(regexp.test(filename)) {
-                    const regexp_remove_nomenclature = new RegExp(nomenclature + ".[ts|js]$");
+                    const regexp_remove_nomenclature = new RegExp("\\.?" + nomenclature + "\\.(ts|js)$");
                     const filename_without_nomenclature = filename.replace(regexp_remove_nomenclature, "");
-
+                    
                     // Append segments
                     const segments = filename_without_nomenclature.split(".");
 
                     // segments info
-                    const segmentsinfo = segments.map((segmentItem) => ({
-                        name: segmentItem,
-                        dynamic: segmentItem.startsWith("[") && segmentItem.endsWith("]")
-                    }))
+                    const segmentsinfo = segments.map((segmentItem) => {
+                        const dynamic = segmentItem.startsWith("[") && segmentItem.endsWith("]");
+
+                        return {
+                            name: dynamic ? segmentItem.slice(1, -1) : segmentItem,
+                            dynamic: dynamic
+                        };
+                    })
                     
                     // Append file access
                     paths.push({
@@ -139,7 +144,12 @@ export default class TreeLoader extends Loader<ITree> {
                         filename: filename,
                         mimetype: mime.lookup(fileDir) || "application/octet-stream",
                         bytes: stat.size,
-                        flat_segments: segmentsinfo.map((sItem) => sItem.name).join("/"),
+                        flat_segments: "/" + segmentsinfo.map((sItem) => (
+                            sItem.dynamic ? ("[" + sItem.name + "]") : sItem.name
+                        )).join("/"),
+                        flat_segments_express: "/" + segmentsinfo.map((sItem) => (
+                            sItem.dynamic ? (":" + sItem.name) : sItem.name
+                        )).join("/"),
                         segments: segmentsinfo
                     });
                 }

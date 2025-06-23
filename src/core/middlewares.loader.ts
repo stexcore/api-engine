@@ -2,10 +2,12 @@ import { ErrorRequestHandler, RequestHandler } from "express";
 import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
-import Middleware, { IMiddewareHandler, IMiddlewareError } from "../class/middleware";
+import Middleware, { IMiddlewareError } from "../class/middleware";
 import Server from "../server/server";
+import { IRouteFile } from "../types/types";
+import { IMiddewareHandler } from "../class/pipe";
 
-export default class MiddlewaresLoader extends Loader<Middleware[]> {
+export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, route: IRouteFile }[]> {
 
     /**
      * Middlewares directory
@@ -21,12 +23,15 @@ export default class MiddlewaresLoader extends Loader<Middleware[]> {
      * Load middlewares
      * @returns Middlewares loaded
      */
-    public async load(): Promise<Middleware[]> {
+    public async load(): Promise<{ middleware: Middleware, route: IRouteFile }[]> {
         // Load tree info
         const tree = await this.treeLoader.load(this.middlewares_dir, "middleware", "compact");
 
         // Load constructors
-        const middlewareConstructors: (new (server: Server) => Middleware)[] = [];
+        const middlewareConstructors: {
+            constructor: new (server: Server) => Middleware,
+            route: IRouteFile
+        }[] = [];
         
         await Promise.all(
             tree.paths.map(async (middlewareFileItem) => {
@@ -79,7 +84,10 @@ export default class MiddlewaresLoader extends Loader<Middleware[]> {
                     }
 
                     if(middleware) {
-                        middlewareConstructors.push(middleware);
+                        middlewareConstructors.push({
+                            constructor: middleware,
+                            route: middlewareFileItem
+                        });
                     }
                     else console.log("⚠️  Invalid middleware:   /" + middlewareFileItem.filename)
                 }
@@ -91,9 +99,13 @@ export default class MiddlewaresLoader extends Loader<Middleware[]> {
         );
 
         // Create middlewares
-        const middlewaresLoaded: Middleware[] = middlewareConstructors.map((middlewareConstructorItem) => (
-            new middlewareConstructorItem(this.server)
-        ));
+        const middlewaresLoaded: {
+            middleware: Middleware,
+            route: IRouteFile
+        }[] = middlewareConstructors.map((middlewareConstructorItem) => ({
+            middleware: new middlewareConstructorItem.constructor(this.server),
+            route: middlewareConstructorItem.route
+        }));
 
         return middlewaresLoaded;
     }

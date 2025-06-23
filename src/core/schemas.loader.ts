@@ -4,8 +4,9 @@ import Loader from "../class/loader";
 import Schema from "../class/schema";
 import TreeLoader from "./tree.loader";
 import Server from "../server/server";
+import { IRouteFile } from "../types/types";
 
-export default class SchemasLoader extends Loader<Schema[]> {
+export default class SchemasLoader extends Loader<{ schema: Schema, route: IRouteFile }[]> {
 
     /**
      * Schemas Directory
@@ -21,13 +22,16 @@ export default class SchemasLoader extends Loader<Schema[]> {
      * Load schemas
      * @returns Schemas loaded
      */
-    public async load(): Promise<Schema[]> {
+    public async load(): Promise<{ schema: Schema, route: IRouteFile }[]> {
 
         // Load tree info
         const tree = await this.treeLoader.load(this.schemas_dir, "schema", "compact");
 
         // Load constructors
-        const schemasConstructors: (new (server: Server) => Schema)[] = [];
+        const schemasConstructors: {
+            constructor: (new (server: Server) => Schema),
+            route: IRouteFile
+        }[] = [];
         
         await Promise.all(
             tree.paths.map(async (schemaFileItem) => {
@@ -47,7 +51,10 @@ export default class SchemasLoader extends Loader<Schema[]> {
                     }
 
                     if(schema) {
-                        schemasConstructors.push(schema);
+                        schemasConstructors.push({
+                            constructor: schema,
+                            route: schemaFileItem
+                        });
                     }
                     else console.log("⚠️  Invalid schema:   /" + schemaFileItem.filename)
                 }
@@ -59,9 +66,13 @@ export default class SchemasLoader extends Loader<Schema[]> {
         );
 
         // Create schemas
-        const schemasLoaded: Schema[] = schemasConstructors.map((schemaConstructorItem) => (
-            new schemaConstructorItem(this.server)
-        ));
+        const schemasLoaded: {
+            schema: Schema,
+            route: IRouteFile
+        }[] = schemasConstructors.map((schemaConstructorItem) => ({
+            route: schemaConstructorItem.route,
+            schema: new schemaConstructorItem.constructor(this.server)
+        }));
 
         return schemasLoaded;
     }

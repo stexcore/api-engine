@@ -6,11 +6,11 @@ export default class AuthSchema extends Schema {
     /**
      * Validation schema into method POST
      */
-    public POST?: ISchemaRequest = {
+    public GET?: ISchemaRequest = {
         /**
          * Headers validation
          */
-        headers: this.joi.object({
+        query: this.joi.object({
             /**
              * Field authorization validation
              */

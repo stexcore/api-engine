@@ -14,7 +14,7 @@ export default class AuthController extends Controller {
      * @param res Response utils
      * @param next Next middleware
      */
-    public POST?: RequestHandler = (req, res, next) => {
+    public GET?: RequestHandler = (req, res, next) => {
         try {
             res.json({
                 success: true,

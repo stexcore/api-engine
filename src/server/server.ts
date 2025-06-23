@@ -1,11 +1,25 @@
 import type { IServerConfig } from "../types/types";
-import express from "express";
+import express, { ErrorRequestHandler, IRoute, RequestHandler } from "express";
 import Service from "../class/service";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
 import MiddlewaresLoader from "../core/middlewares.loader";
 import SchemasLoader from "../core/schemas.loader";
 import ControllersLoader from "../core/controllers.loader";
+import schemaMiddleware from "../middlewares/schema.middleware";
+import "colors";
+import catchHttpErrorMiddleware from "../middlewares/catchHttpError.middleware";
+import catchGlobalErrorMiddleware from "../middlewares/catchGlobalError.middleware";
+import PipesLoader from "../core/pipe.loader";
+
+type IMethodRequest = 
+    | "GET"
+    | "POST"
+    | "PUT"
+    | "DELETE"
+    | "PATCH"
+    | "HEAD"
+    | "OPTIONS";
 
 /**
  * Server instance
@@ -15,7 +29,7 @@ export default class Server {
     /**
      * Circular error
      */
-    private CircularError = class extends Error { };
+    private readonly CircularError = class extends Error { };
 
     /**
      * Express application
@@ -30,7 +44,7 @@ export default class Server {
     /**
      * Server Port
      */
-    protected port: number;
+    protected readonly port: number;
 
     /**
      * Workdir to work
@@ -67,7 +81,7 @@ export default class Server {
      * @param service Service Constructor
      * @returns Service instance created or existent
      */
-    public registerService(constructorServices: (new (server: Server) => Service)[]): Service[] {
+    public registerServices(constructorServices: (new (server: Server) => Service)[]): Service[] {
         // Services registered
         const services: Service[] = [];
         // Set registering services
@@ -122,7 +136,7 @@ export default class Server {
                     ccs !== constructorService
                 ));
 
-                console.log("✅ Service loaded:    /" + constructorService.name);
+                console.log("✅ Service loaded:    " + constructorService.name.yellow);
             }
             else {
                 // Get circular error
@@ -179,28 +193,187 @@ export default class Server {
                 };
 
                 const servicesLoader = new ServicesLoader(this);
-                const middlewaresLoader = new MiddlewaresLoader(this);
+                const pipesLoader = new PipesLoader(this);
                 const schemasLoader = new SchemasLoader(this);
+                const middlewaresLoader = new MiddlewaresLoader(this);
                 const controllersLoader = new ControllersLoader(this);
 
                 servicesLoader.load()
                     .then((servicesConstructors) => {
-                        this.registerService(servicesConstructors);
+                        this.registerServices(servicesConstructors);
 
                         return middlewaresLoader.load();
                     })
                     .then((middlewares) => {
-                        console.log(middlewares);
-                        
-                        return schemasLoader.load();
+                        return pipesLoader.load().then((pipes) => (
+                            { middlewares, pipes }
+                        ))
                     })
-                    .then((schemas) => {
-                        console.log(schemas);
-                        
-                        return controllersLoader.load();
+                    .then((info) => {
+                        return schemasLoader.load().then((schemas) => (
+                            { ...info, schemas }
+                        ));
                     })
-                    .then((controllers) => {
-                        console.log(controllers);
+                    .then((info) => {                        
+                        return controllersLoader.load().then((controllers) => (
+                            { ...info, controllers }
+                        ));
+                    })
+                    .then(({ pipes, schemas, middlewares, controllers }) => {
+
+                        // All methods
+                        const methods: {
+                            [key in IMethodRequest]: string
+                        } = {
+                            "GET": "GET".green,
+                            "POST": "POST".yellow,
+                            "PUT": "PUT".blue,
+                            "DELETE": "DELETE".red,
+                            "PATCH": "PATCH".gray,
+                            "HEAD": "HEAD".green,
+                            "OPTIONS": "OPTIONS".magenta,
+                         } as const;
+
+                        // Traverse all pipes
+                        pipes.forEach((pipe) => {
+
+                            // All requests handler
+                            const handlers: RequestHandler[] = [];
+
+                            // Validate multiples pipes
+                            if(pipe.pipe.handler instanceof Array) {
+                                handlers.push(...pipe.pipe.handler);
+                            }
+                            else if(pipe.pipe.handler) {
+                                handlers.push(pipe.pipe.handler);
+                            }
+
+                            if(handlers.length) {
+                                // Append request handlers (pipes)
+                                this.app.use(pipe.route.flat_segments_express, ...handlers.map((handler) => (
+                                    handler.bind(pipe.pipe)
+                                )));
+
+                                console.log("✅ Pipe loaded:       " + pipe.route.flat_segments.cyan);
+                            }
+                        });
+
+                        // Traverse all schemas
+                        schemas.forEach((schema) => {
+
+                            const methods_loaded: IMethodRequest[] = [];
+
+                            // Traverse all methods
+                            for(const method in methods) {
+
+                                // Validate field
+                                if(method in schema.schema) {
+                                    // Append method loaded
+                                    methods_loaded.push(method as IMethodRequest);
+
+                                    // Access to methods .get, .post, .put, etc...
+                                    this.app[method.toLowerCase() as Lowercase<IMethodRequest>](
+                                        schema.route.flat_segments_express,
+                                        schemaMiddleware(schema.schema[method as IMethodRequest]!)
+                                    );
+                                }
+                            }
+
+                            // validate length methods loaded
+                            if(methods_loaded.length) {
+                                console.log(
+                                    "✅ Schema loaded:     " + schema.route.flat_segments.cyan, 
+                                    methods_loaded.map((m) => (
+                                        methods[m]
+                                    )).join(",")
+                                );
+                            }
+
+                        });
+
+                        // Traverse all middlewares
+                        middlewares.forEach((middleware) => {
+
+                            // All requests handler
+                            const handlers: RequestHandler[] = [];
+
+                            // Validate multiples middlewares
+                            if(middleware.middleware.handler instanceof Array) {
+                                handlers.push(...middleware.middleware.handler);
+                            }
+                            else if(middleware.middleware.handler) {
+                                handlers.push(middleware.middleware.handler);
+                            }
+
+                            if(handlers.length) {
+                                // Append request handlers (middlewares)
+                                this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
+                                    handler.bind(middleware.middleware)
+                                )));
+
+                                console.log("✅ Middleware loaded: " + middleware.route.flat_segments.cyan);
+                            }
+                        });
+
+                        // Traverse all controllers
+                        controllers.forEach((controller) => {
+
+                            const methods_loaded: IMethodRequest[] = [];
+                            
+                            // Traverse all methods
+                            for(const method in methods) {
+
+                                // Validate method into controller
+                                if(method in controller.controller) {
+                                    // Append method loaded
+                                    methods_loaded.push(method as IMethodRequest);
+
+                                    // Append request handler
+                                    this.app.use(
+                                        controller.route.flat_segments_express,
+                                        controller.controller[method as IMethodRequest]!.bind(controller.controller)
+                                    );
+                                }
+                            }
+                            
+                            if(methods_loaded) {
+                                console.log(
+                                    "✅ Controller loaded: " + controller.route.flat_segments.cyan, 
+                                    methods_loaded.map((m) => (
+                                        methods[m]
+                                    )).join(",")
+                                );
+                            }
+
+                        });
+
+                        // Traverse all middlewares to append errors requests handlers
+                        middlewares.forEach((middleware) => {
+
+                            // All requests handler
+                            const handlers: ErrorRequestHandler[] = [];
+
+                            // Validate multiples middlewares
+                            if(middleware.middleware.errors instanceof Array) {
+                                handlers.push(...middleware.middleware.errors);
+                            }
+                            else if(middleware.middleware.errors) {
+                                handlers.push(middleware.middleware.errors);
+                            }
+
+                            if(handlers.length) {
+                                // Append request handlers (middlewares)
+                                this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
+                                    handler.bind(middleware.middleware)
+                                )));
+
+                                console.log("✅ CatchError loaded: " + middleware.route.flat_segments.cyan);
+                            }
+                        });
+
+                        // Append default middlewares
+                        this.app.use(catchHttpErrorMiddleware);
+                        this.app.use(catchGlobalErrorMiddleware);
 
                         // Apply start server
                         startServer();
