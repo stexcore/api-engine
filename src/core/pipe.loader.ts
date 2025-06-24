@@ -1,11 +1,14 @@
-import { RequestHandler } from "express";
 import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
-import Server from "../server/server";
-import { IRouteFile } from "../types/types";
-import Pipe, { IMiddewareHandler } from "../class/pipe";
+import Pipe, { type IMiddewareHandler } from "../class/pipe";
+import type { RequestHandler } from "express";
+import type Server from "../server/server";
+import type { IRouteFile } from "../types/types";
 
+/**
+ * Pipe loader
+ */
 export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile }[]> {
 
     /**
@@ -32,6 +35,7 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
             route: IRouteFile
         }[] = [];
         
+        // Import all files
         await Promise.all(
             tree.paths.map(async (pipeFileItem) => {
                 try {
@@ -75,6 +79,7 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
                     }
 
                     if(pipe) {
+                        // Append pipe founded
                         pipeConstructors.push({
                             constructor: pipe,
                             route: pipeFileItem
@@ -101,9 +106,16 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
         return pipesLoaded;
     }
 
+    /**
+     * Validates and obtains valid request handlers
+     * @param name Name middleware
+     * @param arr Array info unknow data
+     * @returns Requests handlers
+     */
     private analizeArray(name: string, arr: unknown[]) {
         const requestHandlers: RequestHandler[] = [];
         
+        // Traverse the array
         for(let x = 0; x < arr.length; x++) {
             const arrItem = arr[x];
 
@@ -112,7 +124,7 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
                     // Request handler!
                     requestHandlers.push(arrItem as RequestHandler);
                 }
-                else console.log("⚠️  Invalid pipe:         /" + name + "[" + x + "]");
+                else console.log("⚠️  Invalid middleware:   /" + name + "[" + x + "]");
             }
         }
 

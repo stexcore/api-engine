@@ -2,7 +2,7 @@ import path from "path";
 import Loader from "../class/loader";
 import Service from "../class/service";
 import TreeLoader from "./tree.loader";
-import Server from "../server/server";
+import type Server from "../server/server";
 
 /**
  * Services loader
@@ -30,6 +30,7 @@ export default class ServicesLoader extends Loader<(new (server: Server) => Serv
         // Load constructors
         const serviceConstructors: (new (server: Server) => Service)[] = [];
         
+        // Import all files
         await Promise.all(
             tree.paths.map(async (serviceFileItem) => {
                 try {

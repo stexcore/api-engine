@@ -1,10 +1,9 @@
+import type Server from "../server/server";
+import type { IRouteFile } from "../types/types";
 import Controller from "../class/controller";
 import Loader from "../class/loader";
 import path from "path";
-import fs from "fs";
-import { IRouteFile, ISegment } from "../types/types";
 import TreeLoader from "./tree.loader";
-import Server from "../server/server";
 
 /**
  * Controllers loader

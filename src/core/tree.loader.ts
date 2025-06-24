@@ -1,8 +1,8 @@
-import { IRouteFile, ITree } from "../types/types";
 import path from "path";
 import Loader from "../class/loader";
 import fs from "fs";
 import mime from "mime-types";
+import type { IRouteFile, ITree } from "../types/types";
 
 /**
  * Tree loader

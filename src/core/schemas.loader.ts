@@ -1,11 +1,13 @@
 import path from "path";
-import fs from "fs";
 import Loader from "../class/loader";
 import Schema from "../class/schema";
 import TreeLoader from "./tree.loader";
-import Server from "../server/server";
-import { IRouteFile } from "../types/types";
+import type Server from "../server/server";
+import type { IRouteFile } from "../types/types";
 
+/**
+ * Schema loader
+ */
 export default class SchemasLoader extends Loader<{ schema: Schema, route: IRouteFile }[]> {
 
     /**
@@ -33,6 +35,7 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
             route: IRouteFile
         }[] = [];
         
+        // Import all files
         await Promise.all(
             tree.paths.map(async (schemaFileItem) => {
                 try {
@@ -51,6 +54,7 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
                     }
 
                     if(schema) {
+                        // Append schema founded
                         schemasConstructors.push({
                             constructor: schema,
                             route: schemaFileItem

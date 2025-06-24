@@ -122,23 +122,68 @@ export interface ISchema {
     
 }
 
+/**
+ * Segment item
+ */
 export interface ISegmentFile {
+    /**
+     * Is a dynamic segment
+     */
     dynamic: boolean,
+    /**
+     * Segment name
+     */
     name: string,
 }
 
+/**
+ * Route file info
+ */
 export interface IRouteFile {
+    /**
+     * relative path
+     */
     relative: string,
+    /**
+     * absolute path
+     */
     absolute: string,
+    /**
+     * Filename
+     */
     filename: string,
+    /**
+     * Mimetype
+     */
     mimetype: string,
+    /**
+     * Length of bytes
+     */
     bytes: number
+    /**
+     * flat representation of the segments
+     */
     flat_segments: string,
+    /**
+     * Flattened representation of segments compatible with Express
+     */
     flat_segments_express: string,
+    /**
+     * List of each of the segment fragments
+     */
     segments: ISegmentFile[]
 }
 
+/**
+ * Tree info
+ */
 export interface ITree {
+    /**
+     * Base path
+     */
     base: string,
+    /**
+     * All files founded
+     */
     paths: IRouteFile[],
 }

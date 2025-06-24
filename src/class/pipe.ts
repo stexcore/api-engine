@@ -1,4 +1,4 @@
-import type { ErrorRequestHandler, RequestHandler } from "express";
+import type { RequestHandler } from "express";
 import Piece from "./piece";
 
 /**

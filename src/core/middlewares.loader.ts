@@ -1,12 +1,15 @@
-import { ErrorRequestHandler, RequestHandler } from "express";
 import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
-import Middleware, { IMiddlewareError } from "../class/middleware";
-import Server from "../server/server";
-import { IRouteFile } from "../types/types";
-import { IMiddewareHandler } from "../class/pipe";
+import Middleware, { type IMiddlewareError } from "../class/middleware";
+import type { ErrorRequestHandler, RequestHandler } from "express";
+import type Server from "../server/server";
+import type { IRouteFile } from "../types/types";
+import type { IMiddewareHandler } from "../class/pipe";
 
+/**
+ * Middleware loader
+ */
 export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, route: IRouteFile }[]> {
 
     /**
@@ -33,16 +36,22 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
             route: IRouteFile
         }[] = [];
         
+        /**
+         * Import all files founded
+         */
         await Promise.all(
             tree.paths.map(async (middlewareFileItem) => {
                 try {
                     // Load module middleware
                     const moduleMiddleware = await import(middlewareFileItem.absolute);
 
+                    // Middleware loaded
                     let middleware: (new (server: Server) => Middleware) | undefined;
 
                     // Validate middleware valid
                     if(moduleMiddleware.default?.prototype instanceof Middleware) {
+
+                        // Set property
                         Object.defineProperty(moduleMiddleware.default, "name", {
                             writable: true
                         });
@@ -53,6 +62,7 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                         const handlers: RequestHandler[] = [];
                         const errors: ErrorRequestHandler[] = [];
                         
+                        // Validate if an array
                         if(moduleMiddleware.default instanceof Array) {
                             const result = this.analizeArray(middlewareFileItem.filename, moduleMiddleware.default);
 
@@ -67,6 +77,8 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                         }
 
                         if(handlers.length || errors.length) {
+
+                            // Create a anonymous middleware
                             middleware = class extends Middleware {
 
                                 /**
@@ -84,6 +96,7 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                     }
 
                     if(middleware) {
+                        // Append middleware prepared
                         middlewareConstructors.push({
                             constructor: middleware,
                             route: middlewareFileItem
@@ -110,10 +123,17 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
         return middlewaresLoaded;
     }
 
+    /**
+     * Validates and obtains valid request handlers
+     * @param name Name middleware
+     * @param arr Array info unknow data
+     * @returns Requests handlers
+     */
     private analizeArray(name: string, arr: unknown[]) {
         const requestHandlers: RequestHandler[] = [];
         const errorRequestHandlers: ErrorRequestHandler[] = [];
         
+        // Traverse the array
         for(let x = 0; x < arr.length; x++) {
             const arrItem = arr[x];
 
