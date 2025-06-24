@@ -97,63 +97,67 @@ export default class TreeLoader extends Loader<ITree> {
     private async loadFlat(nomenclature: string, dir_base: string): Promise<ITree> {
         // Get current dir
         const dir = path.join(dir_base);
-        // Get list files to current dir
-        const files = fs.readdirSync(dir);
         // Paths loaded
         const paths: IRouteFile[] = [];
 
-        // Traverse array
-        for(const fileItem of files) {
-            // Get file dir
-            const fileDir = path.join(dir, fileItem);
-            // Get info file
-            const stat = fs.statSync(fileDir);
-            // relative directory
-            const relativeDir = fileDir.replace(dir_base, "").replace(/^\//, "");
-            // Filename
-            const filename = path.basename(fileDir);
-
-            if(stat.isDirectory()) {
-                throw new Error("❌ The directories is'nt allowed in flat mode! Unexpected directory '" + relativeDir +"'");
-            }
-
-            else {
-                const regexp = new RegExp(".*\\." + nomenclature + ".[ts|js]");
-
-                if(regexp.test(filename)) {
-                    const regexp_remove_nomenclature = new RegExp("\\.?" + nomenclature + "\\.(ts|js)$");
-                    const filename_without_nomenclature = filename.replace(regexp_remove_nomenclature, "");
-                    
-                    // Append segments
-                    const segments = filename_without_nomenclature.split(".");
-
-                    // segments info
-                    const segmentsinfo = segments.map((segmentItem) => {
-                        const dynamic = segmentItem.startsWith("[") && segmentItem.endsWith("]");
-
-                        return {
-                            name: dynamic ? segmentItem.slice(1, -1) : segmentItem,
-                            dynamic: dynamic
-                        };
-                    })
-                    
-                    // Append file access
-                    paths.push({
-                        absolute: fileDir,
-                        relative: relativeDir,
-                        filename: filename,
-                        mimetype: mime.lookup(fileDir) || "application/octet-stream",
-                        bytes: stat.size,
-                        flat_segments: "/" + segmentsinfo.map((sItem) => (
-                            sItem.dynamic ? ("[" + sItem.name + "]") : sItem.name
-                        )).join("/"),
-                        flat_segments_express: "/" + segmentsinfo.map((sItem) => (
-                            sItem.dynamic ? (":" + sItem.name) : sItem.name
-                        )).join("/"),
-                        segments: segmentsinfo
-                    });
+        // Validate directory
+        if(fs.existsSync(dir)) {
+            // Get list files to current dir
+            const files = fs.readdirSync(dir);
+    
+            // Traverse array
+            for(const fileItem of files) {
+                // Get file dir
+                const fileDir = path.join(dir, fileItem);
+                // Get info file
+                const stat = fs.statSync(fileDir);
+                // relative directory
+                const relativeDir = fileDir.replace(dir_base, "").replace(/^\//, "");
+                // Filename
+                const filename = path.basename(fileDir);
+    
+                if(stat.isDirectory()) {
+                    throw new Error("❌ The directories is'nt allowed in flat mode! Unexpected directory '" + relativeDir +"'");
                 }
-                else throw new Error("❌ The " + nomenclature + " '" + relativeDir + "' is'nt allowed!");
+    
+                else {
+                    const regexp = new RegExp(".*\\." + nomenclature + ".[ts|js]");
+    
+                    if(regexp.test(filename)) {
+                        const regexp_remove_nomenclature = new RegExp("\\.?" + nomenclature + "\\.(ts|js)$");
+                        const filename_without_nomenclature = filename.replace(regexp_remove_nomenclature, "");
+                        
+                        // Append segments
+                        const segments = filename_without_nomenclature.split(".");
+    
+                        // segments info
+                        const segmentsinfo = segments.map((segmentItem) => {
+                            const dynamic = segmentItem.startsWith("[") && segmentItem.endsWith("]");
+    
+                            return {
+                                name: dynamic ? segmentItem.slice(1, -1) : segmentItem,
+                                dynamic: dynamic
+                            };
+                        })
+                        
+                        // Append file access
+                        paths.push({
+                            absolute: fileDir,
+                            relative: relativeDir,
+                            filename: filename,
+                            mimetype: mime.lookup(fileDir) || "application/octet-stream",
+                            bytes: stat.size,
+                            flat_segments: "/" + segmentsinfo.map((sItem) => (
+                                sItem.dynamic ? ("[" + sItem.name + "]") : sItem.name
+                            )).join("/"),
+                            flat_segments_express: "/" + segmentsinfo.map((sItem) => (
+                                sItem.dynamic ? (":" + sItem.name) : sItem.name
+                            )).join("/"),
+                            segments: segmentsinfo
+                        });
+                    }
+                    else throw new Error("❌ The " + nomenclature + " '" + relativeDir + "' is'nt allowed!");
+                }
             }
         }
 
