@@ -1,16 +1,16 @@
 import type { IErrorRequestHandler, IMethod, IRequestHandler, IServerConfig } from "../types/types";
+import type Service from "../class/service";
 import express from "express";
-import Service from "../class/service";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
 import MiddlewaresLoader from "../core/middlewares.loader";
 import SchemasLoader from "../core/schemas.loader";
 import ControllersLoader from "../core/controllers.loader";
 import schemaMiddleware from "../middlewares/schema.middleware";
-import "colors";
 import catchHttpErrorMiddleware from "../middlewares/catchHttpError.middleware";
 import catchGlobalErrorMiddleware from "../middlewares/catchGlobalError.middleware";
 import PipesLoader from "../core/pipe.loader";
+import "colors";
 
 /**
  * Server instance

@@ -37,5 +37,10 @@
   },
   "material-icon-theme.folders.associations": {
     "services": "custom"
+  },
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#111C88",
+    "titleBar.activeBackground": "#1727BE",
+    "titleBar.activeForeground": "#FBFBFE"
   }
 }

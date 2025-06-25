@@ -1,5 +1,4 @@
 import Piece from "./piece";
-import Server from "../server/server";
 import type { IMiddewareHandler, IMiddlewareError } from "../types/types";
 
 /**

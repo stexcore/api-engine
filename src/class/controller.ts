@@ -1,4 +1,4 @@
-import { IRequestHandler } from "../types/types";
+import type { IRequestHandler } from "../types/types";
 import Piece from "./piece";
 
 /**
