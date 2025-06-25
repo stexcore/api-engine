@@ -9,6 +9,6 @@ export default abstract class Pipe extends Piece {
     /**
      * Request handler
      */
-    public readonly abstract handler?: IMiddewareHandler;
+    public readonly abstract handler: IMiddewareHandler;
     
 }
