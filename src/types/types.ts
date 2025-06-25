@@ -31,7 +31,11 @@ export interface IServerConfig {
     /**
      * Workdir to work
      */
-    workdir: string
+    workdir: string,
+    /**
+     * Load mode
+     */
+    mode?: "compact" | "tree"
 }
 
 /**

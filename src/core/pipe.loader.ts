@@ -14,7 +14,7 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
     /**
      * Pipes directory
      */
-    private pipes_dir = path.join(this.server.workdir, "pipes");
+    private pipes_dir = path.join(this.server.workdir, this.server.isCompact ? "pipes" : "app");
 
     /**
      * Tree loader
@@ -27,7 +27,7 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
      */
     public async load(): Promise<{ pipe: Pipe, route: IRouteFile }[]> {
         // Load tree info
-        const tree = await this.treeLoader.load(this.pipes_dir, "pipe", "compact");
+        const tree = await this.treeLoader.load(this.pipes_dir, "pipe", this.server.mode);
 
         // Load constructors
         const pipeConstructors: {

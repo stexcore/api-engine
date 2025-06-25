@@ -13,7 +13,7 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
     /**
      * Load controllers
      */
-    private controllers_dir = path.join(this.server.workdir, "controllers");
+    private controllers_dir = path.join(this.server.workdir, this.server.isCompact ? "controllers" : "app");
     
     /**
      * Tree loader
@@ -28,7 +28,7 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
     public async load(): Promise<{ controller: Controller, route: IRouteFile }[]> {
 
         // Load tree info
-        const tree = await this.treeLoader.load(this.controllers_dir, "controller", "compact");
+        const tree = await this.treeLoader.load(this.controllers_dir, "controller", this.server.mode);
 
         // Load constructors
         const controllersConstructors: {

@@ -2,7 +2,8 @@ import Server from "../src/server/server";
 
 const server = new Server({
     workdir: __dirname,
-    port: 9001
+    port: 9001,
+    mode: "tree"
 });
 
 server.initialize()

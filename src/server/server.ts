@@ -43,6 +43,18 @@ export default class Server {
     public readonly workdir: string
 
     /**
+     * Load mode
+     */
+    public readonly mode: "compact" | "tree";
+
+    /**
+     * Is Compact mode
+     */
+    public get isCompact() {
+        return this.mode === "compact"
+    }
+
+    /**
      * All services 
      */
     public readonly services: Service[] = [];
@@ -65,6 +77,7 @@ export default class Server {
         this.server = http.createServer(this.app);
         this.port = config.port;
         this.workdir = config.workdir;
+        this.mode = config.mode || "compact";
     }
 
     /**

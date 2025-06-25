@@ -14,7 +14,7 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
     /**
      * Middlewares directory
      */
-    private middlewares_dir = path.join(this.server.workdir, "middlewares");
+    private middlewares_dir = path.join(this.server.workdir, this.server.isCompact ? "middlewares" : "app");
 
     /**
      * Tree loader
@@ -27,7 +27,7 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
      */
     public async load(): Promise<{ middleware: Middleware, route: IRouteFile }[]> {
         // Load tree info
-        const tree = await this.treeLoader.load(this.middlewares_dir, "middleware", "compact");
+        const tree = await this.treeLoader.load(this.middlewares_dir, "middleware", this.server.mode);
 
         // Load constructors
         const middlewareConstructors: {

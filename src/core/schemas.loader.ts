@@ -13,7 +13,7 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
     /**
      * Schemas Directory
      */
-    private schemas_dir = path.join(this.server.workdir, "schemas");
+    private schemas_dir = path.join(this.server.workdir, this.server.isCompact ? "schemas" : "app");
     
     /**
      * Tree loader
@@ -27,7 +27,7 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
     public async load(): Promise<{ schema: Schema, route: IRouteFile }[]> {
 
         // Load tree info
-        const tree = await this.treeLoader.load(this.schemas_dir, "schema", "compact");
+        const tree = await this.treeLoader.load(this.schemas_dir, "schema", this.server.mode);
 
         // Load constructors
         const schemasConstructors: {
