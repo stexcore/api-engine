@@ -6,6 +6,7 @@ import Service from "./class/service";
 import Piece from "./class/piece";
 import Pipe from "./class/pipe";
 import Middleware from "./class/middleware";
+import joi from "joi";
 
 /**
  * Create an instance server core
@@ -56,6 +57,8 @@ export {
     createSchema,
     // Schema
     Schema,
+    // Joi
+    joi,
 
     // Schema
     type ISchema,
