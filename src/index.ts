@@ -54,6 +54,8 @@ export {
     createServer,
     // Create schema
     createSchema,
+    // Schema
+    Schema,
 
     // Schema
     type ISchema,

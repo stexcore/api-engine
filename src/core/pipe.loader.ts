@@ -85,11 +85,15 @@ export default class PipesLoader extends Loader<{ pipe: Pipe, route: IRouteFile 
                             route: pipeFileItem
                         });
                     }
-                    else console.log("⚠️  Invalid pipe:         /" + pipeFileItem.filename)
+                    else if (!modulePipe.default || (modulePipe.default instanceof Object && !Object.keys(modulePipe.default).length)) {
+                        console.log(`⚠️  The pipe '${pipeFileItem.relative}' is missing a default export of a class that extends the base Pipe class from @stexcore/api-engine.`);
+                    } else {
+                        console.log(`⚠️  The pipe '${pipeFileItem.relative}' must either extend the base Pipe class from @stexcore/api-engine or be a RequestHandler function (or an array of them).`);
+                    }
                 }
                 catch(err) {
                     console.log(err);
-                    throw new Error("❌ Failed to load pipe:          /" + pipeFileItem.filename);
+                    throw new Error(`❌ Failed to load pipe: '${pipeFileItem.relative}'`);
                 }
             })
         );

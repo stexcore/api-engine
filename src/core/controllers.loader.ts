@@ -43,7 +43,7 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
                     // Load module controller
                     const moduleController = await import(controllerFileItem.absolute);
 
-                    let controller: (new (server: Server) => Controller) | undefined;
+                    
 
                     // Validate controller valid
                     if(moduleController.default?.prototype instanceof Controller) {
@@ -51,20 +51,21 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
                             writable: true
                         });
                         moduleController.default.name = controllerFileItem.filename;
-                        controller = moduleController.default;
-                    }
 
-                    if(controller) {
                         controllersConstructors.push({
-                            constructor: controller,
+                            constructor: moduleController.default,
                             route: controllerFileItem
                         });
                     }
-                    else console.log("⚠️  Invalid controller:   /" + controllerFileItem.filename)
+                    else if (!moduleController.default || (moduleController.default instanceof Object && !Object.keys(moduleController.default).length)) {
+                        console.log(`⚠️  The controller '${controllerFileItem.relative}' is missing a default export of a class that extends the base Controller class from @stexcore/api-engine.`);
+                    } else {
+                        console.log(`⚠️  The controller '${controllerFileItem.relative}' does not extend the base Controller class from @stexcore/api-engine.`);
+                    }
                 }
                 catch(err) {
                     console.log(err);
-                    throw new Error("❌ Failed to load controller:    /" + controllerFileItem.filename);
+                    throw new Error(`❌ Failed to load controller: '${controllerFileItem.relative}'`);
                 }
             })
         );

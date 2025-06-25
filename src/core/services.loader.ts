@@ -45,11 +45,15 @@ export default class ServicesLoader extends Loader<(new (server: Server) => Serv
                         moduleService.default.name = serviceFileItem.filename;
                         serviceConstructors.push(moduleService.default);
                     }
-                    else console.log("⚠️  Invalid service:   /" + serviceFileItem.filename);
+                    else if (!moduleService.default || (moduleService.default instanceof Object && !Object.keys(moduleService.default).length)) {
+                        console.log(`⚠️  The service '${serviceFileItem.relative}' is missing a default export of a class that extends the base Service class from @stexcore/api-engine.`);
+                    } else {
+                        console.log(`⚠️  The service '${serviceFileItem.relative}' does not extend the base Service class from @stexcore/api-engine.`);
+                    }
                 }
                 catch(err) {
                     console.log(err);
-                    throw new Error("❌ Failed to load service:    /" + serviceFileItem.filename);
+                    throw new Error(`❌ Failed to load service: '${serviceFileItem.relative}'`);
                 }
             })
         );

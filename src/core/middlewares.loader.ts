@@ -101,11 +101,15 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                             route: middlewareFileItem
                         });
                     }
-                    else console.log("⚠️  Invalid middleware:   /" + middlewareFileItem.filename)
+                    else if (!moduleMiddleware.default || (moduleMiddleware.default instanceof Object && !Object.keys(moduleMiddleware.default).length)) {
+                        console.log(`⚠️  The middleware '${middlewareFileItem.relative}' is missing a default export of a class that extends the base Middleware class from @stexcore/api-engine.`);
+                    } else {
+                        console.log(`⚠️  The middleware '${middlewareFileItem.relative}' must either extend the base Middleware class from @stexcore/api-engine or be a RequestHandler function (or an array of them).`);
+                    }
                 }
                 catch(err) {
                     console.log(err);
-                    throw new Error("❌ Failed to load middleware:    /" + middlewareFileItem.filename);
+                    throw new Error(`❌ Failed to load middleware: '${middlewareFileItem.relative}'`);
                 }
             })
         );
@@ -119,7 +123,23 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
             route: middlewareConstructorItem.route
         }));
 
-        return middlewaresLoaded;
+        // Middlewares loaded and valids
+        const middlewaresLoadedValids: typeof middlewaresLoaded = [];
+
+        // Traverse all middlewares loaded without validated
+        for(const middleware of middlewaresLoaded) {
+
+            // Validate middleware
+            if (!middleware.middleware.handler && !middleware.middleware.errors) {
+                console.log(`❌ Invalid middleware '${middleware.route.filename}': at least 'handler' or 'errors' must be defined.`);
+            }
+            else {
+                // Append middleware loaded
+                middlewaresLoadedValids.push(middleware);
+            }
+        }
+
+        return middlewaresLoadedValids;
     }
 
     /**

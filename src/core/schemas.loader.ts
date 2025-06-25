@@ -60,11 +60,15 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
                             route: schemaFileItem
                         });
                     }
-                    else console.log("⚠️  Invalid schema:   /" + schemaFileItem.filename)
+                    else if (!moduleSchema.default || (moduleSchema.default instanceof Object && !Object.keys(moduleSchema.default).length)) {
+                        console.log(`⚠️  The schema '${schemaFileItem.relative}' is missing a default export of a class that extends the base Schema class from @stexcore/api-engine.`);
+                    } else {
+                        console.log(`⚠️  The schema '${schemaFileItem.relative}' does not extend the base Schema class from @stexcore/api-engine.`);
+                    }
                 }
                 catch(err) {
                     console.log(err);
-                    throw new Error("❌ Failed to load schema:    /" + schemaFileItem.filename);
+                    throw new Error(`❌ Failed to load schema: '${schemaFileItem.relative}'`);
                 }
             })
         );
