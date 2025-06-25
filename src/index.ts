@@ -1,4 +1,4 @@
-import type { ISchema, IServerConfig } from "./types/types";
+import type { ISchema, IServerConfig, IMethod, ISchemaRequest, IRequestHandler, IErrorRequestHandler, IApplication, IMiddlewareError, IMiddewareHandler } from "./types/types";
 import Server from "./server/server";
 import Schema from "./class/schema";
 import Controller from "./class/controller";
@@ -54,4 +54,23 @@ export {
     createServer,
     // Create schema
     createSchema,
+
+    // Schema
+    type ISchema,
+    // Server Config
+    type IServerConfig,
+    // Method
+    type IMethod,
+    // Schema Request
+    type ISchemaRequest,
+    // Request Handler
+    type IRequestHandler,
+    // Error Request Handler
+    type IErrorRequestHandler,
+    // Application
+    type IApplication,
+    // Middleware Error
+    type IMiddlewareError,
+    // Middeware Handler
+    type IMiddewareHandler
 };

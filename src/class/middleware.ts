@@ -1,12 +1,5 @@
-import type { ErrorRequestHandler } from "express";
 import Pipe from "./pipe";
-
-/**
- * Error request handler
- */
-export type IMiddlewareError =
-    | ErrorRequestHandler
-    | ErrorRequestHandler[]
+import type { IMiddlewareError } from "../types/types";
 
 /**
  * Structure base of middleware 

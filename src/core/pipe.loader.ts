@@ -1,10 +1,10 @@
 import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
-import Pipe, { type IMiddewareHandler } from "../class/pipe";
+import Pipe from "../class/pipe";
 import type { RequestHandler } from "express";
 import type Server from "../server/server";
-import type { IRouteFile } from "../types/types";
+import type { IMiddewareHandler, IRouteFile } from "../types/types";
 
 /**
  * Pipe loader

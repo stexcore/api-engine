@@ -1,12 +1,5 @@
-import type { RequestHandler } from "express";
 import Piece from "./piece";
-
-/**
- * Request handler
- */
-export type IMiddewareHandler =
-    | RequestHandler
-    | RequestHandler[];
+import type { IMiddewareHandler } from "../types/types";
 
 /**
  * Structure base of pipe 

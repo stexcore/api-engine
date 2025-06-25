@@ -1,5 +1,5 @@
-import type { IServerConfig } from "../types/types";
-import express, { ErrorRequestHandler, IRoute, RequestHandler } from "express";
+import type { IErrorRequestHandler, IMethod, IRequestHandler, IServerConfig } from "../types/types";
+import express from "express";
 import Service from "../class/service";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
@@ -11,15 +11,6 @@ import "colors";
 import catchHttpErrorMiddleware from "../middlewares/catchHttpError.middleware";
 import catchGlobalErrorMiddleware from "../middlewares/catchGlobalError.middleware";
 import PipesLoader from "../core/pipe.loader";
-
-type IMethodRequest = 
-    | "GET"
-    | "POST"
-    | "PUT"
-    | "DELETE"
-    | "PATCH"
-    | "HEAD"
-    | "OPTIONS";
 
 /**
  * Server instance
@@ -223,7 +214,7 @@ export default class Server {
 
                         // All methods
                         const methods: {
-                            [key in IMethodRequest]: string
+                            [key in IMethod]: string
                         } = {
                             "GET": "GET".green,
                             "POST": "POST".yellow,
@@ -238,7 +229,7 @@ export default class Server {
                         pipes.forEach((pipe) => {
 
                             // All requests handler
-                            const handlers: RequestHandler[] = [];
+                            const handlers: IRequestHandler[] = [];
 
                             // Validate multiples pipes
                             if(pipe.pipe.handler instanceof Array) {
@@ -261,7 +252,7 @@ export default class Server {
                         // Traverse all schemas
                         schemas.forEach((schema) => {
 
-                            const methods_loaded: IMethodRequest[] = [];
+                            const methods_loaded: IMethod[] = [];
 
                             // Traverse all methods
                             for(const method in methods) {
@@ -269,12 +260,12 @@ export default class Server {
                                 // Validate field
                                 if(method in schema.schema) {
                                     // Append method loaded
-                                    methods_loaded.push(method as IMethodRequest);
+                                    methods_loaded.push(method as IMethod);
 
                                     // Access to methods .get, .post, .put, etc...
-                                    this.app[method.toLowerCase() as Lowercase<IMethodRequest>](
+                                    this.app[method.toLowerCase() as Lowercase<IMethod>](
                                         schema.route.flat_segments_express,
-                                        schemaMiddleware(schema.schema[method as IMethodRequest]!)
+                                        schemaMiddleware(schema.schema[method as IMethod]!)
                                     );
                                 }
                             }
@@ -295,7 +286,7 @@ export default class Server {
                         middlewares.forEach((middleware) => {
 
                             // All requests handler
-                            const handlers: RequestHandler[] = [];
+                            const handlers: IRequestHandler[] = [];
 
                             // Validate multiples middlewares
                             if(middleware.middleware.handler instanceof Array) {
@@ -318,7 +309,7 @@ export default class Server {
                         // Traverse all controllers
                         controllers.forEach((controller) => {
 
-                            const methods_loaded: IMethodRequest[] = [];
+                            const methods_loaded: IMethod[] = [];
                             
                             // Traverse all methods
                             for(const method in methods) {
@@ -326,12 +317,12 @@ export default class Server {
                                 // Validate method into controller
                                 if(method in controller.controller) {
                                     // Append method loaded
-                                    methods_loaded.push(method as IMethodRequest);
+                                    methods_loaded.push(method as IMethod);
 
                                     // Append request handler
                                     this.app.use(
                                         controller.route.flat_segments_express,
-                                        controller.controller[method as IMethodRequest]!.bind(controller.controller)
+                                        controller.controller[method as IMethod]!.bind(controller.controller)
                                     );
                                 }
                             }
@@ -351,7 +342,7 @@ export default class Server {
                         middlewares.forEach((middleware) => {
 
                             // All requests handler
-                            const handlers: ErrorRequestHandler[] = [];
+                            const handlers: IErrorRequestHandler[] = [];
 
                             // Validate multiples middlewares
                             if(middleware.middleware.errors instanceof Array) {

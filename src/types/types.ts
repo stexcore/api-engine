@@ -1,4 +1,5 @@
 import type { ObjectSchema } from "joi";
+import type { RequestHandler, ErrorRequestHandler, Application } from "express";
 
 /**
  * Methods HTTP
@@ -187,3 +188,32 @@ export interface ITree {
      */
     paths: IRouteFile[],
 }
+
+/**
+ * Request Handler
+ */
+export type IRequestHandler = RequestHandler;
+
+/**
+ * Error Request Handler
+ */
+export type IErrorRequestHandler = ErrorRequestHandler; 
+
+/**
+ * Application
+ */
+export type IApplication = Application;
+
+/**
+ * Error request handler
+ */
+export type IMiddlewareError =
+    | IErrorRequestHandler
+    | IErrorRequestHandler[]
+
+/**
+ * Request handler
+ */
+export type IMiddewareHandler =
+    | IRequestHandler
+    | IRequestHandler[];

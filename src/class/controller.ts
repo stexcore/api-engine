@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import { IRequestHandler } from "../types/types";
 import Piece from "./piece";
 
 /**
@@ -9,36 +9,36 @@ export default class Controller extends Piece {
     /**
      * Handle request incomming with method 'GET'
      */
-    public GET?: RequestHandler;
+    public GET?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'POST'
      */
-    public POST?: RequestHandler;
+    public POST?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'PUT'
      */
-    public PUT?: RequestHandler;
+    public PUT?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'DELETE'
      */
-    public DELETE?: RequestHandler;
+    public DELETE?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'PATCH'
      */
-    public PATCH?: RequestHandler;
+    public PATCH?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'HEAD'
      */
-    public HEAD?: RequestHandler;
+    public HEAD?: IRequestHandler;
 
     /**
      * Handle request incomming with method 'OPTIONS'
      */
-    public OPTIONS?: RequestHandler;
+    public OPTIONS?: IRequestHandler;
     
 }

@@ -1,11 +1,10 @@
 import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
-import Middleware, { type IMiddlewareError } from "../class/middleware";
+import Middleware from "../class/middleware";
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import type Server from "../server/server";
-import type { IRouteFile } from "../types/types";
-import type { IMiddewareHandler } from "../class/pipe";
+import type { IMiddewareHandler, IMiddlewareError, IRouteFile } from "../types/types";
 
 /**
  * Middleware loader

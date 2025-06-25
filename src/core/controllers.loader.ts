@@ -36,6 +36,7 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
             route: IRouteFile
         }[] = [];
         
+        // Imports all files
         await Promise.all(
             tree.paths.map(async (controllerFileItem) => {
                 try {
