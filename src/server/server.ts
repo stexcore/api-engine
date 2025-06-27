@@ -301,14 +301,34 @@ export default class Server {
 
                                 // Validate field
                                 if(method in schema.schema) {
-                                    // Append method loaded
-                                    methods_loaded.push(method as IMethod);
+                                    const schemaItem = schema.schema[method as IMethod]!;
 
-                                    // Access to methods .get, .post, .put, etc...
-                                    this.app[method.toLowerCase() as Lowercase<IMethod>](
-                                        schema.route.flat_segments_express,
-                                        schemaMiddleware(schema.schema[method as IMethod]!)
-                                    );
+                                    if(schemaItem && typeof schemaItem === "object") {
+                                        if(
+                                            schemaItem.body && typeof schemaItem.body === "object" ||
+                                            schemaItem.headers && typeof schemaItem.headers === "object" ||
+                                            schemaItem.params && typeof schemaItem.params === "object" ||
+                                            schemaItem.query && typeof schemaItem.query === "object"
+                                        ) {
+                                            // Append method loaded
+                                            methods_loaded.push(method as IMethod);
+        
+                                            // Access to methods .get, .post, .put, etc...
+                                            this.app[method.toLowerCase() as Lowercase<IMethod>](
+                                                schema.route.flat_segments_express,
+                                                schemaMiddleware(schemaItem)
+                                            );
+                                        }
+                                        else {
+                                            console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' doesn't has a validation using 'body', 'headers', 'params' or 'query'.`);
+                                        }
+                                    }
+                                    else if(schemaItem) {
+                                        console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' has an invalid type '${typeof schemaItem}'`);
+                                    }
+                                    else {
+                                        console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' is empty!`);
+                                    }
                                 }
                             }
 
