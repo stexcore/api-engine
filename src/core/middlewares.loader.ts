@@ -130,7 +130,7 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
         for(const middleware of middlewaresLoaded) {
 
             // Validate middleware
-            if (!middleware.middleware.handler && !middleware.middleware.errors) {
+            if (!("handler" in middleware.middleware) && !("errors" in middleware.middleware)) {
                 console.log(`❌ Invalid middleware '${middleware.route.filename}': at least 'handler' or 'errors' must be defined.`);
             }
             else {

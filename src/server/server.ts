@@ -312,10 +312,33 @@ export default class Server {
 
                             // Validate multiples middlewares
                             if(middleware.middleware.handler instanceof Array) {
-                                handlers.push(...middleware.middleware.handler);
+                                if(middleware.middleware.handler.length) {
+                                    for(let x = 0; x < middleware.middleware.handler.length; x++) {
+                                        const requestHandler = middleware.middleware.handler[x];
+    
+                                        if(typeof requestHandler === "function") {
+                                            handlers.push(requestHandler);
+                                        }
+                                        else {
+                                            console.log(`⚠️  The middleware.handler[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+                                        }
+                                    }
+                                }
+                                else {
+                                    console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
+                                }
+                            }
+                            else if(typeof middleware.middleware.handler === "function") {
+                                handlers.push(middleware.middleware.handler);
                             }
                             else if(middleware.middleware.handler) {
-                                handlers.push(middleware.middleware.handler);
+                                console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.handler}'`);
+                            }
+                            else if(
+                                !(middleware.middleware.errors instanceof Array) &&
+                                !("errors" in middleware.middleware)
+                            ) {
+                                console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
                             }
 
                             if(handlers.length) {
@@ -377,10 +400,27 @@ export default class Server {
 
                             // Validate multiples middlewares
                             if(middleware.middleware.errors instanceof Array) {
-                                handlers.push(...middleware.middleware.errors);
+                                if(middleware.middleware.errors.length) {
+                                    for(let x = 0; x < middleware.middleware.errors.length; x++) {
+                                        const requestHandler = middleware.middleware.errors[x];
+    
+                                        if(typeof requestHandler === "function") {
+                                            handlers.push(requestHandler);
+                                        }
+                                        else {
+                                            console.log(`⚠️  The middleware.errors[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+                                        }
+                                    }
+                                }
+                                else {
+                                    console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' is empty!`);
+                                }
+                            }
+                            else if(typeof middleware.middleware.errors === "function") {
+                                handlers.push(middleware.middleware.errors);
                             }
                             else if(middleware.middleware.errors) {
-                                handlers.push(middleware.middleware.errors);
+                                console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.errors}'`);
                             }
 
                             if(handlers.length) {
