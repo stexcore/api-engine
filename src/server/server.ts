@@ -336,16 +336,25 @@ export default class Server {
                             // Traverse all methods
                             for(const method in methods) {
 
+                                // Get method function
+                                const controllerMethod = controller.controller[method as IMethod];
+
                                 // Validate method into controller
-                                if(method in controller.controller) {
+                                if(typeof controllerMethod === "function") {
                                     // Append method loaded
                                     methods_loaded.push(method as IMethod);
 
                                     // Append request handler
                                     this.app.use(
                                         controller.route.flat_segments_express,
-                                        controller.controller[method as IMethod]!.bind(controller.controller)
+                                        controllerMethod!.bind(controller.controller)
                                     );
+                                }
+                                else if(controllerMethod) {
+                                    console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' has an invalid type '${typeof controllerMethod}'`);
+                                }
+                                else if(method in controller.controller) {
+                                    console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' is empty`);
                                 }
                             }
                             

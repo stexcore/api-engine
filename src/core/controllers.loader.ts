@@ -41,9 +41,7 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
             tree.paths.map(async (controllerFileItem) => {
                 try {
                     // Load module controller
-                    const moduleController = await import(controllerFileItem.absolute);
-
-                    
+                    const moduleController = await import(controllerFileItem.absolute);                    
 
                     // Validate controller valid
                     if(moduleController.default?.prototype instanceof Controller) {

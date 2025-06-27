@@ -12,19 +12,20 @@ export default class AuthController extends Controller {
      * @param res Response utils
      * @param next Next middleware
      */
-    public GET?: RequestHandler = (req, res, next) => {
-        try {
-            res.json({
-                success: true,
-                message: "Ok",
-                data: {
-                    token: "12345678"
-                }
-            });
-        }
-        catch(err) {
-            next(err);
-        }
-    }
+    // public GET?: RequestHandler = (req, res, next) => {
+    //     try {
+    //         res.json({
+    //             success: true,
+    //             message: "Ok",
+    //             data: {
+    //                 token: "12345678"
+    //             }
+    //         });
+    //     }
+    //     catch(err) {
+    //         next(err);
+    //     }
+    // }
+    public GET = 1 as any as RequestHandler;
     
 }
