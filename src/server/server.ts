@@ -1,5 +1,5 @@
 import type { IErrorRequestHandler, IMethod, IRequestHandler, IServerConfig } from "../types/types";
-import type Service from "../class/service";
+import Service from "../class/service";
 import express from "express";
 import http from "http";
 import ServicesLoader from "../core/services.loader";
@@ -161,15 +161,24 @@ export default class Server {
      * @returns Service instance
      */
     public getService<S extends Service>(service: new (server: this) => S): S {
+        
+        // Validate service extended
+        if(!(service.prototype instanceof Service)) {
+            throw new Error("❌ The service '" + (service?.name || "unknown") + "' does not extend the base Service class from @stexcore/api-engine.");
+        }
+
+        // Find instance service
         const serviceItem = this.services.find((s) => s instanceof service);
         
         if(!serviceItem) {
+            // Create service
             const constructor = this.constructors_services.find((cs) => cs === service);
 
             if(constructor) {
                 return this.createService(constructor) as S;
             }
-            throw new Error("Service not found!");
+
+            throw new Error("❌ The service '" + service.name + "' is'nt registered! Services should be placed inside the dedicated 'services' folder within your project's resources.");
         }
         return serviceItem as S;
     }
