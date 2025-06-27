@@ -255,10 +255,30 @@ export default class Server {
 
                             // Validate multiples pipes
                             if(pipe.pipe.handler instanceof Array) {
-                                handlers.push(...pipe.pipe.handler);
+                                if(pipe.pipe.handler.length) {
+                                    for(let x = 0; x < pipe.pipe.handler.length; x++) {
+                                        const requestHandler = pipe.pipe.handler[x];
+    
+                                        if(typeof requestHandler === "function") {
+                                            handlers.push(requestHandler);
+                                        }
+                                        else {
+                                            console.log(`⚠️  The pipe.handler[${x}] on '${pipe.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+                                        }
+                                    }
+                                }
+                                else {
+                                    console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' is empty!`);
+                                }
+                            }
+                            else if(typeof pipe.pipe.handler === "function") {
+                                handlers.push(pipe.pipe.handler);
                             }
                             else if(pipe.pipe.handler) {
-                                handlers.push(pipe.pipe.handler);
+                                console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' has an invalid type '${typeof pipe.pipe.handler}'`);
+                            }
+                            else {
+                                console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' is empty!`);
                             }
 
                             if(handlers.length) {
