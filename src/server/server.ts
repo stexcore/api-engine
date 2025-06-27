@@ -40,7 +40,12 @@ export default class Server {
     /**
      * Workdir to work
      */
-    public readonly workdir: string
+    public readonly workdir: string;
+
+    /**
+     * Server running
+     */
+    public running: boolean;
 
     /**
      * Load mode
@@ -78,6 +83,7 @@ export default class Server {
         this.port = config.port;
         this.workdir = config.workdir;
         this.mode = config.mode || "compact";
+        this.running = false;
     }
 
     /**
@@ -140,6 +146,19 @@ export default class Server {
                     ccs !== constructorService
                 ));
 
+                // Wait a tick
+                setTimeout(() => {
+                    try {
+                        // Run anchor onInit
+                        if(serviceItem!.onInit) {
+                            serviceItem!.onInit();
+                        }
+                    }
+                    catch(err) {
+                        console.error(err);
+                    }
+                }, 0);
+
                 console.log("✅ Service loaded:    " + constructorService.name.yellow);
             }
             else {
@@ -189,6 +208,11 @@ export default class Server {
     public initialize() {
         return new Promise<void>((resolve, reject) => {
             try {
+                if(this.running) {
+                    return reject(new Error("The server is running right now!"))
+                }
+                this.running = true;
+                
                 // Apply start server
                 const startServer = () => {
                     try {
@@ -496,11 +520,32 @@ export default class Server {
     public destroy() {
         return new Promise<void>((resolve, reject) => {
             try {
-                // Close listening...
-                this.server.close((err) => {
-                    if(err) return reject(err);
-                    resolve();
-                });
+                if(this.running) {
+                    this.running = false;
+
+                    // Traverse all services
+                    this.services.forEach((s) => {
+                        try {
+
+                            // Run anchort onDestroy
+                            if(s.onDestroy) {
+                                s.onDestroy();
+                            }
+                        }
+                        catch(err) {
+                            console.error(err);
+                        }
+                    });
+                    
+                    // Close listening...
+                    this.server.close((err) => {
+                        if(err) return reject(err);
+                        resolve();
+                    });
+                }
+                else {
+                    reject(new Error("The server isn't running right now!"));
+                }
             }
             catch(err) {
                 reject(err);
