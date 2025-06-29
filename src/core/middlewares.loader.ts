@@ -3,13 +3,13 @@ import path from "path";
 import TreeLoader from "./tree.loader";
 import Middleware from "../class/middleware";
 import type { ErrorRequestHandler, RequestHandler } from "express";
-import type Server from "../server/server";
-import type { IMiddewareHandler, IMiddlewareError, IRouteFile } from "../types/types";
+import type { ILoadedModule, IMiddewareHandler, IMiddlewareConstructor, IMiddlewareError, IRouteFile } from "../types/types";
+import ModuleLoader from "../class/module.loader";
 
 /**
  * Middleware loader
  */
-export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, route: IRouteFile }[]> {
+export default class MiddlewaresLoader extends ModuleLoader<Middleware> {
 
     /**
      * Middlewares directory
@@ -25,15 +25,12 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
      * Load middlewares
      * @returns Middlewares loaded
      */
-    public async load(): Promise<{ middleware: Middleware, route: IRouteFile }[]> {
+    public async load(): Promise<ILoadedModule<Middleware>[]> {
         // Load tree info
         const tree = await this.treeLoader.load(this.middlewares_dir, "middleware", this.server.mode);
 
         // Load constructors
-        const middlewareConstructors: {
-            constructor: new (server: Server) => Middleware,
-            route: IRouteFile
-        }[] = [];
+        const middlewaresLoaded: ILoadedModule<Middleware>[] = [];
         
         /**
          * Import all files founded
@@ -45,16 +42,10 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                     const moduleMiddleware = await import(middlewareFileItem.absolute);
 
                     // Middleware loaded
-                    let middleware: (new (server: Server) => Middleware) | undefined;
+                    let middleware: IMiddlewareConstructor | undefined;
 
                     // Validate middleware valid
                     if(moduleMiddleware.default?.prototype instanceof Middleware) {
-
-                        // Set property
-                        Object.defineProperty(moduleMiddleware.default, "name", {
-                            writable: true
-                        });
-                        moduleMiddleware.default.name = middlewareFileItem.filename;
                         middleware = moduleMiddleware.default;
                     }
                     else {
@@ -95,51 +86,67 @@ export default class MiddlewaresLoader extends Loader<{ middleware: Middleware, 
                     }
 
                     if(middleware) {
-                        // Append middleware prepared
-                        middlewareConstructors.push({
-                            constructor: middleware,
-                            route: middlewareFileItem
-                        });
+                        try {
+                            // Set property
+                            Object.defineProperty(middleware, "name", {
+                                writable: true,
+                                value: middlewareFileItem.relative
+                            });
+
+                            // Middleware instance
+                            const middlewareInstance = new middleware(this.server);
+
+                            if (!("handler" in middlewareInstance) && !("errors" in middlewareInstance)) {
+                                // Missing handler or errors
+                                middlewaresLoaded.push({
+                                    status: "missing-handler-or-error",
+                                    route: middlewareFileItem
+                                });
+                            }
+                            else {
+                                // Append middleware prepared
+                                middlewaresLoaded.push({
+                                    status: "loaded",
+                                    module: middlewareInstance,
+                                    route: middlewareFileItem
+                                });
+                            }
+                            
+                        }
+                        catch(err) {
+                            middlewaresLoaded.push({
+                                status: "constructor-error",
+                                route: middlewareFileItem,
+                                error: err
+                            });
+                        }
                     }
                     else if (!moduleMiddleware.default || (moduleMiddleware.default instanceof Object && !Object.keys(moduleMiddleware.default).length)) {
-                        console.log(`⚠️  The middleware '${middlewareFileItem.relative}' is missing a default export of a class that extends the base Middleware class from @stexcore/api-engine.`);
+                        middlewaresLoaded.push({
+                            status: "missing-default-export",
+                            route: middlewareFileItem
+                        });
+                        // console.log(`⚠️  The middleware '${middlewareFileItem.relative}' is missing a default export of a class that extends the base Middleware class from @stexcore/api-engine.`);
                     } else {
-                        console.log(`⚠️  The middleware '${middlewareFileItem.relative}' must either extend the base Middleware class from @stexcore/api-engine or be a RequestHandler function (or an array of them).`);
+                        middlewaresLoaded.push({
+                            status: "not-extends-valid-class",
+                            route: middlewareFileItem
+                        });
+                        // console.log(`⚠️  The middleware '${middlewareFileItem.relative}' must either extend the base Middleware class from @stexcore/api-engine or be a RequestHandler function (or an array of them).`);
                     }
                 }
                 catch(err) {
-                    console.log(err);
-                    throw new Error(`❌ Failed to load middleware: '${middlewareFileItem.relative}'`);
+                    middlewaresLoaded.push({
+                        status: "failed-import",
+                        route: middlewareFileItem,
+                        error: err
+                    });
+                    // throw new Error(`❌ Failed to load middleware: '${middlewareFileItem.relative}'`);
                 }
             })
         );
 
-        // Create middlewares
-        const middlewaresLoaded: {
-            middleware: Middleware,
-            route: IRouteFile
-        }[] = middlewareConstructors.map((middlewareConstructorItem) => ({
-            middleware: new middlewareConstructorItem.constructor(this.server),
-            route: middlewareConstructorItem.route
-        }));
-
-        // Middlewares loaded and valids
-        const middlewaresLoadedValids: typeof middlewaresLoaded = [];
-
-        // Traverse all middlewares loaded without validated
-        for(const middleware of middlewaresLoaded) {
-
-            // Validate middleware
-            if (!("handler" in middleware.middleware) && !("errors" in middleware.middleware)) {
-                console.log(`❌ Invalid middleware '${middleware.route.filename}': at least 'handler' or 'errors' must be defined.`);
-            }
-            else {
-                // Append middleware loaded
-                middlewaresLoadedValids.push(middleware);
-            }
-        }
-
-        return middlewaresLoadedValids;
+        return middlewaresLoaded;
     }
 
     /**

@@ -1,4 +1,5 @@
 import type Server from "../server/server";
+import type { IServiceConstructor } from "../types/types";
 import type Service from "./service";
 
 /**
@@ -18,7 +19,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public getService<S extends Service>(service: new (server: Server) => S): S {
+    public getService<S extends Service>(service: IServiceConstructor): S {
         return this.server.getService<S>(service);
     }
 
@@ -27,7 +28,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public service$<S extends Service>(service: new (server: Server) => S): S {
+    public service$<S extends Service>(service: IServiceConstructor): S {
         return this.server.getService<S>(service);
     }
 
@@ -36,7 +37,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public $<S extends Service>(service: new (server: Server) => S): S {
+    public $<S extends Service>(service: IServiceConstructor): S {
         return this.server.getService<S>(service);
     }
     

@@ -1,13 +1,13 @@
 import path from "path";
-import Loader from "../class/loader";
 import Service from "../class/service";
 import TreeLoader from "./tree.loader";
-import type Server from "../server/server";
+import ModuleLoader from "../class/module.loader";
+import type { ILoadedModule, IServiceConstructor } from "../types/types";
 
 /**
  * Services loader
  */
-export default class ServicesLoader extends Loader<(new (server: Server) => Service)[]> {
+export default class ServicesLoader extends ModuleLoader<IServiceConstructor> {
 
     /**
      * Service directory
@@ -23,12 +23,12 @@ export default class ServicesLoader extends Loader<(new (server: Server) => Serv
      * Load all services into workdir
      * @returns All controllers
      */
-    public async load(): Promise<(new (server: Server) => Service)[]> {
+    public async load(): Promise<ILoadedModule<IServiceConstructor>[]> {
         // Load tree info
         const tree = await this.treeLoader.load(this.services_dir, "service", "compact");
 
         // Load constructors
-        const serviceConstructors: (new (server: Server) => Service)[] = [];
+        const serviceConstructorsLoaded: ILoadedModule<IServiceConstructor>[] = [];
         
         // Import all files
         await Promise.all(
@@ -40,25 +40,41 @@ export default class ServicesLoader extends Loader<(new (server: Server) => Serv
                     // Validate service valid
                     if(moduleService.default?.prototype instanceof Service) {
                         Object.defineProperty(moduleService.default, "name", {
-                            writable: true
+                            writable: true,
+                            value: serviceFileItem.relative
                         });
-                        moduleService.default.name = serviceFileItem.filename;
-                        serviceConstructors.push(moduleService.default);
+                        serviceConstructorsLoaded.push({
+                            status: "loaded",
+                            module: moduleService.default,
+                            route: serviceFileItem
+                        });
                     }
                     else if (!moduleService.default || (moduleService.default instanceof Object && !Object.keys(moduleService.default).length)) {
-                        console.log(`⚠️  The service '${serviceFileItem.relative}' is missing a default export of a class that extends the base Service class from @stexcore/api-engine.`);
+                        serviceConstructorsLoaded.push({
+                            status: "missing-default-export",
+                            route: serviceFileItem
+                        });
+                        // console.log(`⚠️  The service '${serviceFileItem.relative}' is missing a default export of a class that extends the base Service class from @stexcore/api-engine.`);
                     } else {
-                        console.log(`⚠️  The service '${serviceFileItem.relative}' does not extend the base Service class from @stexcore/api-engine.`);
+                        serviceConstructorsLoaded.push({
+                            status: "not-extends-valid-class",
+                            route: serviceFileItem
+                        });
+                        // console.log(`⚠️  The service '${serviceFileItem.relative}' does not extend the base Service class from @stexcore/api-engine.`);
                     }
                 }
                 catch(err) {
-                    console.log(err);
-                    throw new Error(`❌ Failed to load service: '${serviceFileItem.relative}'`);
+                    serviceConstructorsLoaded.push({
+                        status: "failed-import",
+                        route: serviceFileItem,
+                        error: err
+                    });
+                    // throw new Error(`❌ Failed to load service: '${serviceFileItem.relative}'`);
                 }
             })
         );
 
-        return serviceConstructors;
+        return serviceConstructorsLoaded;
     }
     
 }

@@ -1,5 +1,10 @@
 import type { ObjectSchema } from "joi";
 import type { RequestHandler, ErrorRequestHandler, Application } from "express";
+import type Server from "../server/server";
+import type Service from "../class/service";
+import Middleware from "../class/middleware";
+import Pipe from "../class/pipe";
+import Schema from "../class/schema";
 
 /**
  * Methods HTTP
@@ -19,6 +24,16 @@ export type IMethod =
 export type ISegment = 
     | { type: "dynamic", param: string }
     | { type: "static", segment: string };
+
+export type ILoadedModule<T> = 
+    { route: IRouteFile } & (
+        | { status: "loaded", module: T }
+        | { status: "missing-default-export" }
+        | { status: "not-extends-valid-class" }
+        | { status: "failed-import", error: unknown }
+        | { status: "constructor-error", error: unknown }
+        | { status: "missing-handler-or-error" }
+    )
 
 /**
  * Server config
@@ -221,3 +236,23 @@ export type IMiddlewareError =
 export type IMiddewareHandler =
     | IRequestHandler
     | IRequestHandler[];
+
+/**
+ * Service constructor
+ */
+export type IServiceConstructor = new (server: Server) => Service;
+
+/**
+ * Middleware constructor
+ */
+export type IMiddlewareConstructor = new (server: Server) => Middleware;
+
+/**
+ * Pipe constructor
+ */
+export type IPipeConstructor = new (server: Server) => Pipe;
+
+/**
+ * Schema constructor
+ */
+export type ISchemaConstructor = new (server: Server) => Schema;

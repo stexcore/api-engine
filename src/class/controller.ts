@@ -1,5 +1,5 @@
-import type { IRequestHandler } from "../types/types";
 import Piece from "./piece";
+import type { IRequestHandler } from "../types/types";
 
 /**
  * Structure base of controller

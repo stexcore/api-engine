@@ -1,14 +1,13 @@
 import path from "path";
-import Loader from "../class/loader";
 import Schema from "../class/schema";
 import TreeLoader from "./tree.loader";
-import type Server from "../server/server";
-import type { IRouteFile } from "../types/types";
+import type { ILoadedModule, ISchemaConstructor } from "../types/types";
+import ModuleLoader from "../class/module.loader";
 
 /**
  * Schema loader
  */
-export default class SchemasLoader extends Loader<{ schema: Schema, route: IRouteFile }[]> {
+export default class SchemasLoader extends ModuleLoader<Schema> {
 
     /**
      * Schemas Directory
@@ -24,16 +23,13 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
      * Load schemas
      * @returns Schemas loaded
      */
-    public async load(): Promise<{ schema: Schema, route: IRouteFile }[]> {
+    public async load(): Promise<ILoadedModule<Schema>[]> {
 
         // Load tree info
         const tree = await this.treeLoader.load(this.schemas_dir, "schema", this.server.mode);
 
-        // Load constructors
-        const schemasConstructors: {
-            constructor: (new (server: Server) => Schema),
-            route: IRouteFile
-        }[] = [];
+        // Loaded schemas
+        const schemasLoaded: ILoadedModule<Schema>[] = [];
         
         // Import all files
         await Promise.all(
@@ -42,45 +38,63 @@ export default class SchemasLoader extends Loader<{ schema: Schema, route: IRout
                     // Load module schema
                     const moduleSchema = await import(schemaFileItem.absolute);
 
-                    let schema: (new (server: Server) => Schema) | undefined;
+                    let schema: ISchemaConstructor | undefined;
 
                     // Validate schema valid
-                    if(moduleSchema.default?.prototype instanceof Schema) {
-                        Object.defineProperty(moduleSchema.default, "name", {
-                            writable: true
-                        });
-                        moduleSchema.default.name = schemaFileItem.filename;
+                    if(moduleSchema?.default?.prototype instanceof Schema) {
                         schema = moduleSchema.default;
                     }
 
                     if(schema) {
-                        // Append schema founded
-                        schemasConstructors.push({
-                            constructor: schema,
-                            route: schemaFileItem
-                        });
+                        try {
+                            // Set property
+                            Object.defineProperty(schema, "name", {
+                                writable: true,
+                                value: schemaFileItem.relative
+                            });
+                            // Append schema founded
+                            schemasLoaded.push({
+                                status: "loaded",
+                                module: new schema(this.server),
+                                route: schemaFileItem,
+                            });
+                        }
+                        catch(err) {
+                            // Append schema founded
+                            schemasLoaded.push({
+                                status: "constructor-error",
+                                route: schemaFileItem,
+                                error: err
+                            });
+                        }
                     }
                     else if (!moduleSchema.default || (moduleSchema.default instanceof Object && !Object.keys(moduleSchema.default).length)) {
-                        console.log(`⚠️  The schema '${schemaFileItem.relative}' is missing a default export of a class that extends the base Schema class from @stexcore/api-engine.`);
+                        // Append missing default export
+                        schemasLoaded.push({
+                            status: "missing-default-export",
+                            route: schemaFileItem,
+                        });
+                        // console.log(`⚠️  The schema '${schemaFileItem.relative}' is missing a default export of a class that extends the base Schema class from @stexcore/api-engine.`);
                     } else {
-                        console.log(`⚠️  The schema '${schemaFileItem.relative}' does not extend the base Schema class from @stexcore/api-engine.`);
+                        // Append not extends valid class
+                        schemasLoaded.push({
+                            status: "not-extends-valid-class",
+                            route: schemaFileItem,
+                        });
+                        // console.log(`⚠️  The schema '${schemaFileItem.relative}' does not extend the base Schema class from @stexcore/api-engine.`);
                     }
                 }
                 catch(err) {
-                    console.log(err);
-                    throw new Error(`❌ Failed to load schema: '${schemaFileItem.relative}'`);
+                    // Append failed inport
+                    schemasLoaded.push({
+                        status: "failed-import",
+                        route: schemaFileItem,
+                        error: err
+                    });
+                    // throw new Error(`❌ Failed to load schema: '${schemaFileItem.relative}'`);
                 }
             })
         );
-
-        // Create schemas
-        const schemasLoaded: {
-            schema: Schema,
-            route: IRouteFile
-        }[] = schemasConstructors.map((schemaConstructorItem) => ({
-            route: schemaConstructorItem.route,
-            schema: new schemaConstructorItem.constructor(this.server)
-        }));
 
         return schemasLoaded;
     }

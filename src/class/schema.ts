@@ -1,10 +1,11 @@
 import Joi from "joi";
+import Piece from "./piece";
 import type { ISchema, ISchemaRequest } from "../types/types";
 
 /**
  * Schema validation
  */
-export default class Schema implements ISchema {
+export default class Schema extends Piece implements ISchema {
 
     /**
      * Utilidades Joi

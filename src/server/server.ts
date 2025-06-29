@@ -1,4 +1,4 @@
-import type { IErrorRequestHandler, IMethod, IRequestHandler, IRouteFile, IServerConfig } from "../types/types";
+import type { IErrorRequestHandler, IMethod, IRequestHandler, IRouteFile, IServerConfig, IServiceConstructor } from "../types/types";
 import Service from "../class/service";
 import express from "express";
 import http from "http";
@@ -83,7 +83,7 @@ export default class Server {
         /**
          * Constructor service
          */
-        constructor: (new (server: Server) => Service),
+        constructor: IServiceConstructor,
         /**
          * Dynamic service
          */
@@ -93,7 +93,7 @@ export default class Server {
     /**
      * Creating constructors services
      */
-    private creating_constructors_services: (new (server: this) => Service)[] = [];
+    private creating_constructors_services: IServiceConstructor[] = [];
 
     /**
      * All abort controllers to abort initializing server
@@ -122,7 +122,7 @@ export default class Server {
      * @param service Service Constructor
      * @returns Service instance created or existent
      */
-    public registerService(constructorServices: (new (server: Server) => Service)): Service {
+    public registerService(constructorServices: IServiceConstructor): Service {
         // Services loaded
         const services = this.registerServices([constructorServices], false);
 
@@ -135,7 +135,7 @@ export default class Server {
      * @param service Service Constructor
      * @returns Service instance created or existent
      */
-    protected registerServices(constructorServices: (new (server: Server) => Service)[], dynamic: boolean): Service[] {
+    protected registerServices(constructorServices: IServiceConstructor[], dynamic: boolean): Service[] {
         // Services registered
         const services: Service[] = [];
         // Set registering services
@@ -175,7 +175,7 @@ export default class Server {
      * @param constructorService Constructor service
      * @returns Service instance
      */
-    protected createService(constructorService: new (server: this) => Service, dynamic: boolean) {
+    protected createService(constructorService: IServiceConstructor, dynamic: boolean) {
         // Find existent service
         let serviceItem = this.services.find((s) => s.service instanceof constructorService);
 
@@ -227,7 +227,7 @@ export default class Server {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public getService<S extends Service>(service: new (server: Server) => S): S {
+    public getService<S extends Service>(service: IServiceConstructor): S {
 
         // Validate service extended
         if (!(service.prototype instanceof Service)) {
@@ -391,7 +391,7 @@ export default class Server {
         const controllersLoader = new ControllersLoader(this);
 
         // Declare vars
-        let servicesConstructors: (new (server: Server) => Service)[];
+        let servicesConstructors: IServiceConstructor[];
         let middlewares: { middleware: Middleware, route: IRouteFile }[];
         let pipes: { pipe: Pipe, route: IRouteFile }[];
         let schemas: { schema: Schema, route: IRouteFile }[];

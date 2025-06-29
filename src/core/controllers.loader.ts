@@ -1,14 +1,13 @@
-import type Server from "../server/server";
-import type { IRouteFile } from "../types/types";
+import type { ILoadedModule } from "../types/types";
 import Controller from "../class/controller";
-import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
+import LoaderModule from "../class/module.loader";
 
 /**
  * Controllers loader
  */
-export default class ControllersLoader extends Loader<{ controller: Controller, route: IRouteFile }[]> {
+export default class ControllersLoader extends LoaderModule<Controller> {
     
     /**
      * Load controllers
@@ -25,16 +24,13 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
      * Load controllers
      * @returns controllers loaded
      */
-    public async load(): Promise<{ controller: Controller, route: IRouteFile }[]> {
+    public async load(): Promise<ILoadedModule<Controller>[]> {
 
         // Load tree info
         const tree = await this.treeLoader.load(this.controllers_dir, "controller", this.server.mode);
 
-        // Load constructors
-        const controllersConstructors: {
-            constructor: (new (server: Server) => Controller),
-            route: IRouteFile
-        }[] = [];
+        // controllers loaded
+        const controllersLoaded: ILoadedModule<Controller>[] = [];
         
         // Imports all files
         await Promise.all(
@@ -44,38 +40,54 @@ export default class ControllersLoader extends Loader<{ controller: Controller, 
                     const moduleController = await import(controllerFileItem.absolute);                    
 
                     // Validate controller valid
-                    if(moduleController.default?.prototype instanceof Controller) {
+                    if(moduleController?.default?.prototype instanceof Controller) {
+                        // Set property
                         Object.defineProperty(moduleController.default, "name", {
-                            writable: true
+                            writable: true,
+                            value: controllerFileItem.relative
                         });
-                        moduleController.default.name = controllerFileItem.filename;
 
-                        controllersConstructors.push({
-                            constructor: moduleController.default,
-                            route: controllerFileItem
-                        });
+                        try {
+                            // Try to create a new instance
+                            controllersLoaded.push({
+                                status: "loaded",
+                                module: new moduleController.constructor(this.server),
+                                route: controllerFileItem
+                            });
+                        }
+                        catch(err) {
+                            // Append status constructor-error
+                            controllersLoaded.push({
+                                status: "constructor-error",
+                                route: controllerFileItem,
+                                error: err,
+                            });
+                        }
                     }
                     else if (!moduleController.default || (moduleController.default instanceof Object && !Object.keys(moduleController.default).length)) {
-                        console.log(`⚠️  The controller '${controllerFileItem.relative}' is missing a default export of a class that extends the base Controller class from @stexcore/api-engine.`);
+                        controllersLoaded.push({
+                            status: "missing-default-export",
+                            route: controllerFileItem
+                        });
+                        // console.log(`⚠️  The controller '${controllerFileItem.relative}' is missing a default export of a class that extends the base Controller class from @stexcore/api-engine.`);
                     } else {
-                        console.log(`⚠️  The controller '${controllerFileItem.relative}' does not extend the base Controller class from @stexcore/api-engine.`);
+                        controllersLoaded.push({
+                            status: "not-extends-valid-class",
+                            route: controllerFileItem
+                        });
+                        // console.log(`⚠️  The controller '${controllerFileItem.relative}' does not extend the base Controller class from @stexcore/api-engine.`);
                     }
                 }
                 catch(err) {
-                    console.log(err);
-                    throw new Error(`❌ Failed to load controller: '${controllerFileItem.relative}'`);
+                    controllersLoaded.push({
+                        status: "failed-import",
+                        route: controllerFileItem,
+                        error: err
+                    });
+                    // throw new Error(`❌ Failed to load controller: '${controllerFileItem.relative}'`);
                 }
             })
         );
-
-        // Create controllers
-        const controllersLoaded: {
-            controller: Controller,
-            route: IRouteFile
-        }[] = controllersConstructors.map((controllerConstructorItem) => ({
-            controller: new controllerConstructorItem.constructor(this.server),
-            route: controllerConstructorItem.route
-        }));
 
         return controllersLoaded;
     }
