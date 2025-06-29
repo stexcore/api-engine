@@ -13,3 +13,5 @@ server.initialize()
     .catch((err) => {
         console.error(err);
     });
+
+// server.destroy();
