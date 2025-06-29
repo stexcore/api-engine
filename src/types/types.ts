@@ -32,7 +32,11 @@ export type ILoadedModule<T> =
         | { status: "not-extends-valid-class" }
         | { status: "failed-import", error: unknown }
         | { status: "constructor-error", error: unknown }
-        | { status: "missing-handler-or-error" }
+        | { status: "invalid-function-request-handler", keyname: "handler" | "error", array?: { index: number } }
+        | { status: "too-many-parameters-request-handler", keyname: "handler" | "error", array?: { index: number } }
+        | { status: "missing-joi-schemas", method: IMethod }
+        | { status: "invalid-type-schema-request", type_received: string, method: IMethod }
+        | { status: "missing-some-member-declaration" }
     )
 
 /**

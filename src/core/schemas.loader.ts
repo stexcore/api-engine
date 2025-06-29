@@ -1,8 +1,10 @@
 import path from "path";
 import Schema from "../class/schema";
 import TreeLoader from "./tree.loader";
-import type { ILoadedModule, ISchemaConstructor } from "../types/types";
+import type { ILoadedModule, IMethod, ISchemaConstructor, ISchemaRequest } from "../types/types";
 import ModuleLoader from "../class/module.loader";
+import { methods } from "../constants/method.constant";
+import Joi from "joi";
 
 /**
  * Schema loader
@@ -38,26 +40,65 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
                     // Load module schema
                     const moduleSchema = await import(schemaFileItem.absolute);
 
-                    let schema: ISchemaConstructor | undefined;
-
                     // Validate schema valid
                     if(moduleSchema?.default?.prototype instanceof Schema) {
-                        schema = moduleSchema.default;
-                    }
-
-                    if(schema) {
                         try {
                             // Set property
-                            Object.defineProperty(schema, "name", {
+                            Object.defineProperty(moduleSchema.default, "name", {
                                 writable: true,
                                 value: schemaFileItem.relative
                             });
-                            // Append schema founded
-                            schemasLoaded.push({
-                                status: "loaded",
-                                module: new schema(this.server),
-                                route: schemaFileItem,
-                            });
+
+                            const schemaInstance = new moduleSchema.default(this.server);
+                            const methods_loaded: IMethod[] = [];
+
+                            for(const method in methods) {
+
+                                if(method in schemaInstance) {
+                                    const methodSchemaInstance = schemaInstance[method] as ISchemaRequest;
+
+                                    if(methodSchemaInstance && typeof methodSchemaInstance === "object") {
+                                        if(
+                                            Joi.isSchema(methodSchemaInstance.body) ||
+                                            Joi.isSchema(methodSchemaInstance.headers) ||
+                                            Joi.isSchema(methodSchemaInstance.params) ||
+                                            Joi.isSchema(methodSchemaInstance.query)
+                                        ) {
+                                            methods_loaded.push(method as IMethod);
+                                        }
+                                        else {
+                                            schemasLoaded.push({
+                                                status: "missing-joi-schemas",
+                                                method: method as IMethod,
+                                                route: schemaFileItem
+                                            });
+                                        }
+                                    }
+                                    else if(typeof methodSchemaInstance !== "undefined") {
+                                        schemasLoaded.push({
+                                            status: "invalid-type-schema-request",
+                                            type_received: typeof methodSchemaInstance,
+                                            method: method as IMethod,
+                                            route: schemaFileItem
+                                        });
+                                    }
+                                    else delete schemaInstance[method];
+                                }
+                            }
+
+                            if(methods_loaded.length) {
+                                schemasLoaded.push({
+                                    status: "loaded",
+                                    module: schemaInstance,
+                                    route: schemaFileItem
+                                });
+                            }
+                            else {
+                                schemasLoaded.push({
+                                    status: "missing-some-member-declaration",
+                                    route: schemaFileItem
+                                });
+                            }
                         }
                         catch(err) {
                             // Append schema founded

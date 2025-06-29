@@ -1,4 +1,4 @@
-import type { IErrorRequestHandler, IMethod, IRequestHandler, IRouteFile, IServerConfig, IServiceConstructor } from "../types/types";
+import type { IErrorRequestHandler, ILoadedModule, IMethod, IRequestHandler, IRouteFile, IServerConfig, IServiceConstructor } from "../types/types";
 import Service from "../class/service";
 import express from "express";
 import http from "http";
@@ -18,6 +18,7 @@ import Controller from "../class/controller";
 import { methods } from "../constants/method.constant";
 import { promisify } from "util";
 import { Socket } from "net";
+import logger from "../utils/logger";
 
 /**
  * Server instance
@@ -360,7 +361,7 @@ export default class Server {
             try {
                 socket.destroy(new Error("Server stoped!"));
             }
-            catch(err) {
+            catch (err) {
                 console.error(err);
             }
         });
@@ -369,12 +370,12 @@ export default class Server {
         this.abort_controllers_initializing_server.forEach((controller) => {
             controller.abort(new Error("Server destroyed!"));
         })
-        
+
         // Reset server config
         this.initServeConfig();
-        
+
         // Validate if the server is listening incomming requests
-        if(server.listening) {
+        if (server.listening) {
             // Close server
             await promisify(server.close.bind(server))();
         }
@@ -391,93 +392,106 @@ export default class Server {
         const controllersLoader = new ControllersLoader(this);
 
         // Declare vars
-        let servicesConstructors: IServiceConstructor[];
-        let middlewares: { middleware: Middleware, route: IRouteFile }[];
-        let pipes: { pipe: Pipe, route: IRouteFile }[];
-        let schemas: { schema: Schema, route: IRouteFile }[];
-        let controllers: { controller: Controller, route: IRouteFile }[];
+        let services: ILoadedModule<IServiceConstructor>[];
+        let middlewares: ILoadedModule<Middleware>[];
+        let pipes: ILoadedModule<Pipe>[];
+        let schemas: ILoadedModule<Schema>[];
+        let controllers: ILoadedModule<Controller>[];
 
-        // Load services
-        yield servicesConstructors = await servicesLoader.load()
+        /*******************************************************
+         * Load services section
+         ******************************************************/
+        yield services = await servicesLoader.load()
+
+        // Initialize service constructors variable
+        const servicesConstructors: IServiceConstructor[] = [];
+
+        // Traverse all services loaded
+        for (const service of services) {
+
+            // switch case
+            switch (service.status) {
+                case "loaded":
+                    servicesConstructors.push(service.module);
+                    break;
+
+                case "failed-import":
+                    logger.error("Faile to import the service", service.route.relative.cyan);
+                    break;
+
+                case "missing-default-export":
+                    logger.error("Missing the default export on the service", service.route.relative.cyan);
+
+                case "not-extends-valid-class":
+                    logger.error("The export does'nt extends the Service class on the export", service.route.relative.cyan);
+
+                default:
+                    logger.warm("Unhandle error of type '" + service.status.magenta + "'");
+            }
+        }
 
         // Register services
         yield this.registerServices(servicesConstructors, true);
 
-        // Load middlewares
-        yield middlewares = await middlewaresLoader.load();
-
         // Load pipes
         yield pipes = await pipesLoader.load();
+
+        // Traverse all pipes
+        for (const pipe of pipes) {
+            switch (pipe.status) {
+                case "loaded":
+                    const handlers = pipe.module.handler instanceof Array ? pipe.module.handler : [pipe.module.handler];
+
+                    // Append request handlers (pipes)
+                    this.app.use(pipe.route.flat_segments_express, ...handlers.map((handler) => (
+                        handler.bind(pipe.module)
+                    )));
+                    break;
+
+                case "too-many-parameters-request-handler":
+                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function has more than three parameters, suggesting that it is not a valid request handler.`)
+                    break;
+
+                case "invalid-function-request-handler":
+                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function is not valid`);
+                    break;
+
+                case "constructor-error":
+                    logger.error("Error thrown while constructing the pipe instance", pipe.route.relative.cyan);
+                    break;
+
+                case "failed-import":
+                    logger.error("Faile to import the pipe", pipe.route.relative.cyan);
+                    break;
+
+                case "missing-default-export":
+                    logger.error("Missing the default export on the pipe", pipe.route.relative.cyan);
+
+                case "not-extends-valid-class":
+                    logger.error("The export does'nt extends the Pipe class on the export", pipe.route.relative.cyan);
+
+                default:
+                    logger.warm("Unhandle error of type '" + pipe.status.magenta + "'");
+            }
+        }
 
         // Load schemas
         yield schemas = await schemasLoader.load();
 
-        // Load controllers
-        yield controllers = await controllersLoader.load();
-
-        // interrupt process if it was aborted
-        if (abortSignal.aborted) return;
-        // Traverse all pipes
-        for (const pipe of pipes) {
-            // All requests handler
-            const handlers: IRequestHandler[] = [];
-
-            // Validate multiples pipes
-            if (pipe.pipe.handler instanceof Array) {
-                if (pipe.pipe.handler.length) {
-                    for (let x = 0; x < pipe.pipe.handler.length; x++) {
-                        const requestHandler = pipe.pipe.handler[x];
-
-                        if (typeof requestHandler === "function") {
-                            handlers.push(requestHandler);
-                        }
-                        else {
-                            console.log(`⚠️  The pipe.handler[${x}] on '${pipe.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
-                        }
-                    }
-                }
-                else {
-                    console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' is empty!`);
-                }
-            }
-            else if (typeof pipe.pipe.handler === "function") {
-                handlers.push(pipe.pipe.handler);
-            }
-            else if (pipe.pipe.handler) {
-                console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' has an invalid type '${typeof pipe.pipe.handler}'`);
-            }
-            else {
-                console.log(`⚠️  The pipe.handler on '${pipe.route.flat_segments}' is empty!`);
-            }
-
-            if (handlers.length) {
-                // Append request handlers (pipes)
-                this.app.use(pipe.route.flat_segments_express, ...handlers.map((handler) => (
-                    handler.bind(pipe.pipe)
-                )));
-
-                console.log("✅ Pipe loaded:       " + pipe.route.flat_segments.cyan);
-            }
-        }
-
         // Traverse all schemas
         for (const schema of schemas) {
-            const methods_loaded: IMethod[] = [];
 
-            // Traverse all methods
-            for (const method in methods) {
+            switch (schema.status) {
+                case "loaded":
+                    const methods_loaded: IMethod[] = [];
+                    
+                    // Traverse all methods
+                    for (const method in methods) {
 
-                // Validate field
-                if (method in schema.schema) {
-                    const schemaItem = schema.schema[method as IMethod]!;
+                        // Validate field
+                        if (method in schema.module) {
+                            const schemaItem = schema.module[method as IMethod]!;
 
-                    if (schemaItem && typeof schemaItem === "object") {
-                        if (
-                            schemaItem.body && typeof schemaItem.body === "object" ||
-                            schemaItem.headers && typeof schemaItem.headers === "object" ||
-                            schemaItem.params && typeof schemaItem.params === "object" ||
-                            schemaItem.query && typeof schemaItem.query === "object"
-                        ) {
                             // Append method loaded
                             methods_loaded.push(method as IMethod);
 
@@ -487,29 +501,48 @@ export default class Server {
                                 schemaMiddleware(schemaItem)
                             );
                         }
-                        else {
-                            console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' doesn't has a validation using 'body', 'headers', 'params' or 'query'.`);
-                        }
                     }
-                    else if (schemaItem) {
-                        console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' has an invalid type '${typeof schemaItem}'`);
-                    }
-                    else {
-                        console.log(`⚠️  The ${method} method schema on '${schema.route.flat_segments}' is empty!`);
-                    }
-                }
-            }
+                    break;
 
-            // validate length methods loaded
-            if (methods_loaded.length) {
-                console.log(
-                    "✅ Schema loaded:     " + schema.route.flat_segments.cyan,
-                    methods_loaded.map((m) => (
-                        methods[m]
-                    )).join(",")
-                );
+                case "invalid-type-schema-request":
+                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' has an invalid type '${schema.type_received}'`);
+                    break;
+
+                case "missing-joi-schemas":
+                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' doesn't has a validation using 'body', 'headers', 'params' or 'query'.`);
+                    break;
+
+                case "missing-some-member-declaration":
+                    logger.error("No HTTP methods (GET, POST, etc.) defined in schema", schema.route.relative.cyan);
+                    break;
+
+                case "constructor-error":
+                    logger.error("Error thrown while constructing the schema instance", schema.route.relative.cyan);
+                    break;
+
+                case "failed-import":
+                    logger.error("Faile to import the schema", schema.route.relative.cyan);
+                    break;
+
+                case "missing-default-export":
+                    logger.error("Missing the default export on the schema", schema.route.relative.cyan);
+
+                case "not-extends-valid-class":
+                    logger.error("The export does'nt extends the Schema class on the export", schema.route.relative.cyan);
+
+                default:
+                    logger.warm("Unhandle error of type '" + schema.status.magenta + "'");
             }
         }
+
+        // Load middlewares
+        yield middlewares = await middlewaresLoader.load();
+
+        // Load controllers
+        yield controllers = await controllersLoader.load();
+
+        // interrupt process if it was aborted
+        if (abortSignal.aborted) return;
 
         // Traverse all middlewares
         for (const middleware of middlewares) {
@@ -651,22 +684,22 @@ export default class Server {
         this.server = http.createServer(this.app);
         // Clean sockets
         this.sockets = new Set();
-        
+
         // Append listenner
         this.server.on("connection", (socket) => {
 
             // Validate if it is'nt running
-            if(!this.running) {
+            if (!this.running) {
                 try {
                     socket.destroy(
                         new Error("The server is'nt running!")
                     );
                 }
-                catch(err) {
+                catch (err) {
                     console.error(err);
                 }
             }
-            
+
             // Append socket
             this.sockets.add(socket);
 

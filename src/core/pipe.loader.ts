@@ -2,8 +2,7 @@ import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
 import Pipe from "../class/pipe";
-import type { RequestHandler } from "express";
-import type { ILoadedModule, IMiddewareHandler, IPipeConstructor, IRouteFile } from "../types/types";
+import type { ILoadedModule, IMiddewareHandler, IPipeConstructor, IRequestHandler, IRouteFile } from "../types/types";
 import ModuleLoader from "../class/module.loader";
 
 /**
@@ -45,30 +44,18 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                     if(modulePipe.default?.prototype instanceof Pipe) {
                         pipe = modulePipe.default;
                     }
-                    else {
-                        const handlers: RequestHandler[] = [];
-                        
-                        if(modulePipe.default instanceof Array) {
-                            const result = this.analizeArray(pipeFileItem.filename, modulePipe.default);
+                    else if(
+                        modulePipe.default instanceof Array &&
+                        typeof modulePipe.default === "function"
+                    ) {
+                        pipe = class extends Pipe {
 
-                            handlers.push(...result.handler);
-                        }
-                        else if(typeof modulePipe.default === "function") {
-                            const result = this.analizeArray(pipeFileItem.filename, [modulePipe.default]);
-
-                            handlers.push(...result.handler);
-                        }
-
-                        if(handlers.length) {
-                            pipe = class extends Pipe {
-
-                                /**
-                                 * Request handlers
-                                 */
-                                public handler: IMiddewareHandler = handlers;
-                                
-                            }
-                        }
+                            /**
+                             * Request handlers
+                             */
+                            public handler: IMiddewareHandler = modulePipe.default;
+                            
+                        };
                     }
 
                     if(pipe) {
@@ -78,12 +65,42 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                                 writable: true,
                                 value: pipeFileItem.relative
                             });
-                            // Append pipe founded
-                            pipesLoaded.push({
-                                status: "loaded",
-                                module: new pipe(this.server),
-                                route: pipeFileItem
-                            });
+
+                            // Create a new instance of pipe
+                            const pipeInstance = new pipe(this.server);
+
+                            if(pipeInstance.handler instanceof Array) {
+                                for(let x = 0; x < pipeInstance.handler.length; x++) {
+                                    const handlerItem = pipeInstance.handler[x];
+
+                                    if(typeof handlerItem === 'function') {
+                                        if(handlerItem.length <= 3) {
+                                            // Append pipe founded
+                                            pipesLoaded.push({
+                                                status: "loaded",
+                                                module: pipeInstance,
+                                                route: pipeFileItem
+                                            });
+                                        }
+                                        else {
+                                            pipesLoaded.push({
+                                                status: "too-many-parameters-request-handler",
+                                                keyname: "handler",
+                                                route: pipeFileItem,
+                                                array: { index: x }
+                                            });
+                                        }
+                                    }
+                                    else {
+                                        pipesLoaded.push({
+                                            status: "invalid-function-request-handler",
+                                            keyname: "handler",
+                                            route: pipeFileItem,
+                                            array: { index: x }
+                                        });
+                                    }
+                                }
+                            }
                         }
                         catch(err) {
                             pipesLoaded.push({
@@ -119,30 +136,5 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
         );
 
         return pipesLoaded;
-    }
-
-    /**
-     * Validates and obtains valid request handlers
-     * @param name Name middleware
-     * @param arr Array info unknow data
-     * @returns Requests handlers
-     */
-    private analizeArray(name: string, arr: unknown[]) {
-        const requestHandlers: RequestHandler[] = [];
-        
-        // Traverse the array
-        for(let x = 0; x < arr.length; x++) {
-            const arrItem = arr[x];
-
-            if(typeof arrItem === "function") {
-                if(arrItem.length === 3) {
-                    // Request handler!
-                    requestHandlers.push(arrItem as RequestHandler);
-                }
-                else console.log("⚠️  Invalid middleware:   /" + name + "[" + x + "]");
-            }
-        }
-
-        return { handler: requestHandlers };
     }
 }

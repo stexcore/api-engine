@@ -14,6 +14,6 @@ export default abstract class Middleware extends Piece {
     /**
      * Error request handlers
      */
-    public readonly errors?: IMiddlewareError;
+    public readonly error?: IMiddlewareError;
     
 }
