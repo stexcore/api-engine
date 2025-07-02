@@ -1,4 +1,4 @@
-import type { ISchema, IServerConfig, IMethod, ISchemaRequest, IRequestHandler, IErrorRequestHandler, IApplication, IMiddlewareError, IMiddewareHandler, ISchemaConstructor } from "./types/types";
+import type { ISchema, IServerConfig, IMethod, ISchemaRequest, IRequestHandler, IErrorRequestHandler, IApplication, IMiddlewareError, IMiddlewareHandler, ISchemaConstructor } from "./types/types";
 import Server from "./server/server";
 import Schema from "./class/schema";
 import Controller from "./class/controller";
@@ -89,5 +89,5 @@ export {
     // Middleware Error
     type IMiddlewareError,
     // Middeware Handler
-    type IMiddewareHandler
+    type IMiddlewareHandler
 };

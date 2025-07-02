@@ -3,7 +3,7 @@ import TreeLoader from "./tree.loader";
 import Middleware from "../class/middleware";
 import ModuleLoader from "../class/module.loader";
 import classUtil from "../utils/class";
-import type { IErrorRequestHandler, ILoadedModule, IMiddewareHandler, IMiddlewareConstructor, IRequestHandler } from "../types/types";
+import type { IErrorRequestHandler, ILoadedModule, IMiddlewareHandler, IMiddlewareConstructor, IRequestHandler } from "../types/types";
 
 /**
  * Middleware loader
@@ -55,7 +55,7 @@ export default class MiddlewaresLoader extends ModuleLoader<Middleware> {
                             /**
                              * Request handlers
                              */
-                            public handler: IMiddewareHandler = moduleMiddleware.default;
+                            public handler: IMiddlewareHandler = moduleMiddleware.default;
 
                         };
                     }

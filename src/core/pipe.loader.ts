@@ -3,7 +3,7 @@ import TreeLoader from "./tree.loader";
 import Pipe from "../class/pipe";
 import ModuleLoader from "../class/module.loader";
 import classUtil from "../utils/class";
-import type { ILoadedModule, IMiddewareHandler, IPipeConstructor, IRequestHandler } from "../types/types";
+import type { ILoadedModule, IMiddlewareHandler, IPipeConstructor, IRequestHandler } from "../types/types";
 
 /**
  * Pipe loader
@@ -55,7 +55,7 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                             /**
                              * Request handlers
                              */
-                            public handler: IMiddewareHandler = modulePipe.default;
+                            public handler: IMiddlewareHandler = modulePipe.default;
 
                         };
                     }

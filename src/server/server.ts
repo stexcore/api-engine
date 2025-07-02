@@ -81,7 +81,7 @@ export default class Server {
     /**
      * All services 
      */
-    public readonly services: { dynamic: boolean, service: Service }[] = [];
+    protected readonly services: { dynamic: boolean, service: Service }[] = [];
 
     /**
      * Registering constructors services

@@ -22,6 +22,7 @@ Whether you're building a compact REST API or a deeply nested route-driven syste
 - **Zero-Friction Validation:** Attach `Joi`-powered schemas to your endpoints with full type safety.
 - **Modular Services:** Inject reusable business logic anywhere using the built-in service layer.
 - **Extendable Pieces:** Customize controllers, middlewares, pipes and more by extending intuitive base classes.
+- **Structured Diagnostics:** All modules return typed load results with precise status codes and traceable failure reasons.
 
 ---
 
@@ -39,7 +40,7 @@ Make sure you have the following installed in your project:
 
 - [Node.js](https://nodejs.org/) (version 18+ recommended)
 - [`express`](https://www.npmjs.com/package/express) (optional)
-- [`joi`](https://www.npmjs.com/package/joi) (optional)
+- [`joi`](https://www.npmjs.com/package/joi) (required for schema validation)
 - [`@stexcore/http-status`](https://www.npmjs.com/package/@stexcore/http-status) (recommended)
 
 You can install them together if needed:
@@ -68,6 +69,7 @@ const server = createServer({
   port: 9200,
   workdir: __dirname,
   mode: "tree", // Optional: 'compact' (default) | 'tree'
+  allowCircularServiceDeps: true, // Optional: default it is false
 });
 
 server.initialize()
@@ -76,6 +78,8 @@ server.initialize()
   })
   .catch(console.error);
 ```
+
+> ℹ️ When you call .initialize(), the engine completes all module loading and starts the server internally — no need to call .listen() yourself, as it’s not exposed.
 
 This sets up:
 
@@ -104,6 +108,7 @@ const server = createServer({
   port: 9001,
   workdir: __dirname,
   mode: "tree", // Options: "compact" (default) | "tree"
+  allowCircularServiceDeps: true, // Optional: default it is false
 });
 ```
 
@@ -234,7 +239,7 @@ Both modes are supported equally across all loaders — choose the one that matc
 | **Routing by Convention**     | Route paths are derived from filenames or folder hierarchy depending on selected `mode`. |
 | **Dynamic Segments**          | Define route parameters using `[param]` syntax in either file or folder names. |
 | **Schema-Driven Validation**  | Integrates with Joi to bind request validations to each HTTP method in schemas. |
-| **Lifecycle-Aware Services**  | Create reusable service classes with optional `initialize()` and `destroy()` hooks. |
+| **Lifecycle-Aware Services**  | Create reusable service classes with optional `onInit()` and `onDestroy()` hooks. |
 | **Customizable Middlewares**  | Define middlewares with full support for both handler and error boundaries. |
 | **Pluggable Pipe System**     | Attach transformation or filtering logic to endpoints using dedicated pipe classes. |
 | **Express Compatible**        | Fully compatible with native Express handlers, routers, and middleware patterns. |
@@ -335,33 +340,33 @@ Each service class must:
 
 - Extend the `Service` class (which itself extends [Piece](#-the-piece-class))
 - Export a default class
-- Optionally implement lifecycle hooks: `initialize()` and `destroy()`
+- Optionally implement lifecycle hooks: `onInit()` and `onDestroy()`
 
 ---
 
-### 🔎 Anatomy
+#### 🔎 Anatomy
 
 ```ts
 export default class Service extends Piece {
-  public initialize?(): void;
-  public destroy?(): void;
+  public onInit?(): void;
+  public onDestroy?(): void;
 }
 ```
 
-- The optional `initialize()` method runs once when `server.initialize()` is called.
-- The optional `destroy()` method runs when the server is shutting down.
+- The optional `onInit()` method runs once when `server.initialize()` is called.
+- The optional `onDestroy()` method runs when the server is shutting down.
 - Like all `Piece`-based modules, you have access to `this.server` and can inject other services via `this.$(OtherService)`.
 
 ---
 
-### 🧠 Usage Example
+#### 🧠 Usage Example
 
 ```ts
 // src/services/logger.service.ts
 import { Service } from "@stexcore/api-engine";
 
 export default class LoggerService extends Service {
-  public initialize() {
+  public onInit() {
     console.log("[Logger] Ready!");
   }
 
@@ -380,17 +385,19 @@ logger.log("Hello from route!");
 
 ---
 
-### 📁 File Placement
+#### 📁 File Placement
 
-| Mode    | Path Example                     | Notes                        |
-|---------|----------------------------------|------------------------------|
-| any     | `services/logger.service.ts`   | Same in both modes           |
+| Mode    | Path Example                   | Notes              |
+|---------|--------------------------------|--------------------|
+| any     | `services/logger.service.ts`   | Same in both modes |
 
 **Convention:** Always use the `.service.ts` suffix and place services in the global `services/` directory.
 
 ---
 
 Services are registered before any other module during initialization — making them the perfect place for persistent connections, shared memory, or utility logic.
+
+> ℹ️ Services are automatically validated during load. If a service fails to construct, export incorrectly, or declares circular dependencies, the engine reports a precise and traceable diagnostic per file.
 
 ---
 
@@ -406,15 +413,15 @@ Each pipe must:
 
 - Extend the `Pipe` class (which itself extends [Piece](#-the-piece-class))
 - Export a default class
-- Implement a read-only `handler: IMiddewareHandler` (works like an Express middleware)
+- Implement a read-only `handler: IMiddlewareHandler` (works like an Express middleware)
 
 ---
 
-### 🔎 Anatomy
+#### 🔎 Anatomy
 
 ```ts
 export default abstract class Pipe extends Piece {
-  public readonly abstract handler: IMiddewareHandler;
+  public readonly abstract handler: IMiddlewareHandler;
 }
 ```
 
@@ -427,7 +434,7 @@ Pipes are executed **before** schemas and middlewares — giving them a privileg
 
 ---
 
-### 🧪 Usage Example
+#### 🧪 Usage Example
 
 ```ts
 // src/app/form/submit/pipe.ts (tree mode)
@@ -449,7 +456,7 @@ export default class RawBodyPipe extends Pipe {
 
 ---
 
-### 📁 File Placement
+#### 📁 File Placement
 
 | Mode    | Path Example                                       | Notes                      |
 |---------|----------------------------------------------------|----------------------------|
@@ -461,6 +468,10 @@ export default class RawBodyPipe extends Pipe {
 ---
 
 Pipes are small but powerful — they act as preprocessors that seamlessly fit into your request lifecycle. Use them wisely to encapsulate parsing, filtering, or coercion logic close to the route.
+
+---
+
+> ℹ️ Pipes are automatically validated during startup. If a pipe fails to export correctly or its `handler` property is missing or invalid, the engine will report a detailed, traceable error associated with the corresponding route.
 
 ---
 
@@ -476,7 +487,7 @@ Each schema module must:
 
 ---
 
-### 🔎 Anatomy
+#### 🔎 Anatomy
 
 The `Schema` class allows method-specific validation for:
 
@@ -498,7 +509,7 @@ export interface ISchemaRequest {
 
 ---
 
-### 🧠 Class-Based Schema Example
+#### 🧠 Class-Based Schema Example
 
 ```ts
 // src/app/user/[id]/schema.ts
@@ -517,7 +528,7 @@ You can use `this.joi` inside the schema to access Joi utilities.
 
 ---
 
-### 🧩 createSchema() Alternative
+#### 🧩 createSchema() Alternative
 
 If you prefer object-based definitions without subclassing:
 
@@ -538,7 +549,7 @@ This is functionally equivalent and fully supported — although less extensible
 
 ---
 
-### 📁 File Placement
+#### 📁 File Placement
 
 | Mode    | Path Example                         | Notes                             |
 |---------|--------------------------------------|-----------------------------------|
@@ -550,6 +561,10 @@ This is functionally equivalent and fully supported — although less extensible
 ---
 
 Schemas are one of the most powerful ways to enforce stability, safety, and consistency across your API endpoints — with zero runtime ambiguity.
+
+---
+
+> ℹ️ Schemas are automatically validated at runtime. If no HTTP method is defined (e.g. `GET`, `POST`, etc.) or any schema field is malformed, the engine logs a clear diagnostic tied to the affected route path.
 
 ---
 
@@ -571,11 +586,11 @@ Each middleware must:
 
 ---
 
-### 🔎 Anatomy
+#### 🔎 Anatomy
 
 ```ts
 export abstract class Middleware extends Piece {
-  public readonly handler?: IMiddewareHandler;
+  public readonly handler?: IMiddlewareHandler;
   public readonly errors?: IMiddlewareError;
 }
 ```
@@ -587,7 +602,7 @@ Both are read-only and required to be defined at runtime.
 
 ---
 
-### 🧠 Usage Example
+#### 🧠 Usage Example
 
 ```ts
 import { Middleware } from "@stexcore/api-engine";
@@ -615,7 +630,7 @@ export default class AuthMiddleware extends Middleware {
 
 ---
 
-### 📁 File Placement
+#### 📁 File Placement
 
 | Mode    | Path Example                                | Notes                             |
 |---------|---------------------------------------------|-----------------------------------|
@@ -626,13 +641,17 @@ export default class AuthMiddleware extends Middleware {
 
 ---
 
-### ⚠️ Error Handling Behavior
+#### ⚠️ Error Handling Behavior
 
 If `errors` is defined, it will be **automatically attached as the last error middleware** for that route scope. This honors Express’s error pipeline and ensures your custom handlers receive validation, auth, or runtime exceptions at the correct time.
 
 ---
 
 Middlewares are your app’s gatekeepers — lean, readable, and powerful when chained with schemas and pipes. Think of them as guardrails between validation and business logic.
+
+---
+
+> ℹ️ Middlewares are validated at load time. If neither `handler` nor `errors` are defined, or if their structure is invalid, the engine logs a precise error associated with the affected route for easier debugging.
 
 ---
 
@@ -648,7 +667,7 @@ Each controller must:
 
 ---
 
-### 🔎 Anatomy
+#### 🔎 Anatomy
 
 The `Controller` class inherits from a shared base called [Piece](#-the-piece-class), which gives it direct access to:
 
@@ -671,7 +690,7 @@ export default class Controller extends Piece {
 
 ---
 
-### 🛠️ Usage Example
+#### 🛠️ Usage Example
 
 ```ts
 // src/app/user/[id]/controller.ts (tree mode)
@@ -694,7 +713,7 @@ export default class UserController extends Controller {
 
 ---
 
-### 📁 File Placement
+#### 📁 File Placement
 
 | Mode    | Path Example                                             | Notes                      |
 |---------|-----------------------------------------------------------|----------------------------|
@@ -709,6 +728,10 @@ Controllers should stay focused on routing logic. Shared behavior and complex op
 
 ---
 
+> ℹ️ Controllers are validated automatically at load time. If no supported HTTP method is implemented, or if the controller exports an invalid structure, the engine logs a precise error tied to the route path.
+
+---
+
 ### 🧱 The Piece Class
 
 At the foundation of every major component in `@stexcore/api-engine` — whether it’s a controller, middleware, pipe, or service — lives a minimal but powerful base class: `Piece`.
@@ -717,7 +740,7 @@ This abstract class provides shared functionality and a consistent interface acr
 
 ---
 
-### 🧬 Anatomy
+#### 🧬 Anatomy
 
 ```ts
 export class Piece {
@@ -753,7 +776,7 @@ Under the hood:
 1. During `server.initialize()`, all service classes in `/services` are discovered.
 2. The engine builds a **dependency graph**, instantiating each service in the correct order.
 3. If a circular reference is detected between services, an exception is thrown.
-4. Once instantiated, each service has its `initialize()` method (if defined) called immediately.
+4. Once instantiated, each service has its `onInit()` method (if defined) called immediately.
 5. Services are then stored in the engine’s internal registry and made globally accessible via `this.$(...)`.
 
 🧠 **Note:** Services are eagerly loaded — they are **not instantiated lazily or per-request**. Your app can rely on their presence from the moment initialization completes.
@@ -988,27 +1011,32 @@ src/
 4. Errors are auto-forwarded to per-route or global middleware.
 5. App is ready to receive traffic.
 
+> ℹ️ During each stage of the load process, the engine performs structured validation per module. If a service, schema, middleware, or controller is misconfigured or fails to meet expected shape (e.g. missing methods, invalid arity, unresolved circular dependencies), the engine emits clear diagnostic logs — including the file path and the reason for failure.
+
 ---
 
 ### ⚙️ index.ts
 
 ```ts
 import { createServer } from "@stexcore/api-engine";
-import config from "./config";
 
 // Build and start
-const server = createServer(config);
+const server = createServer({
+  port: 9001,
+  workdir: __dirname,
+  mode: "tree", // Options: "compact" (default) | "tree"
+  allowCircularServiceDeps: true, // Optional: default it is false
+});
 
 async function start() {
   try {
     await server.initialize(); // Load all modules
-    const app = await server.listen(3000);
     console.log("API running on http://localhost:3000");
 
     // Optional cleanup
     process.on("SIGINT", () => {
       console.log("Shutting down...");
-      server.destroy(); // Triggers destroy() on services
+      server.destroy(); // Triggers onDestroy() on services
       process.exit();
     });
   } catch (err) {
@@ -1018,92 +1046,6 @@ async function start() {
 
 start();
 ```
-
----
-
-### 📌 Example Modules
-
-#### auth.service.ts
-
-```ts
-import { Service } from "@stexcore/api-engine";
-
-export default class AuthService extends Service {
-  private tokens = new Set<string>();
-
-  public initialize() {
-    this.tokens.add("test-token");
-  }
-
-  login(u: string, p: string) {
-    const token = "test-token";
-    this.tokens.add(token);
-    return token;
-  }
-
-  isValid(token: string) {
-    return this.tokens.has(token);
-  }
-}
-```
-
-#### login/controller.ts
-
-```ts
-import { Controller } from "@stexcore/api-engine";
-
-export default class LoginController extends Controller {
-  auth = this.$(AuthService);
-
-  public POST = (req, res) => {
-    const token = this.auth.login(req.body.username, req.body.password);
-    res.json({ token });
-  };
-}
-```
-
-#### user/[id]/controller.ts
-
-```ts
-import { Controller } from "@stexcore/api-engine";
-
-export default class UserController extends Controller {
-  public GET = (req, res) => {
-    res.json({ id: req.params.id, name: "John Doe" });
-  };
-}
-```
-
-#### user/[id]/middleware.ts
-
-```ts
-import { Middleware } from "@stexcore/api-engine";
-
-export default class AuthMiddleware extends Middleware {
-  public handler = (req, _res, next) => {
-    const token = req.headers["authorization"];
-    if (token !== "test-token") return next(new Error("Unauthorized"));
-    next();
-  };
-
-  public errors = (err, _req, res, _next) => {
-    res.status(401).json({ message: "Access denied" });
-  };
-}
-```
-
----
-
-### 📊 Summary
-
-| Concept        | Files Involved                       |
-|----------------|--------------------------------------|
-| Lifecycle      | `initialize()`, `destroy()`        |
-| DI (Service)   | `this.$(Service)` in all modules    |
-| Error Handling | `errors()` in middleware            |
-| Flow           | Pipe → Schema → Middleware → Handler |
-
-This structure is scalable, predictable, and plug-in friendly. You’re free to grow your API across domains without sacrificing clarity or control.
 
 ---
 
@@ -1133,6 +1075,11 @@ export interface IServerConfig {
    * Load mode for module resolution
    */
   mode?: "compact" | "tree";
+
+  /**
+   * Allow circular dependencies between services
+   */
+  allowCircularServiceDeps?: boolean   
 }
 ```
 
@@ -1142,9 +1089,10 @@ export interface IServerConfig {
 
 | Field     | Required | Type                 | Description                                                              |
 |-----------|----------|----------------------|--------------------------------------------------------------------------|
-| `port`     | ✅       | `number`             | Port where the server will listen after `.listen()`                     |
+| `port`     | ✅       | `number`             | The port where the engine starts listening internally during `.initialize()` — no need to call `.listen()`. |
 | `workdir`  | ✅       | `string`             | Absolute path used as base to resolve app/services (usually `__dirname`) |
 | `mode`     | ❌       | `"compact" | "tree"` | Controls module discovery layout: compact = file-named paths, tree = folder routes |
+| `allowCircularServiceDeps` | ❌       | `boolean` | Whether circular references between services are allowed during resolution |
 
 ---
 
@@ -1157,9 +1105,14 @@ const server = createServer({
   port: 3000,
   workdir: __dirname,
   mode: "tree", // Optional, "tree" or "compact"
+  allowCircularServiceDeps: true, // Optional: default it is false
 });
 
-await server.initialize();
+server.initialize()
+  .then(() => {
+    console.log("Server is running on port 9200");
+  })
+  .catch(console.error);
 ```
 
 ---

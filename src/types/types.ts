@@ -242,7 +242,7 @@ export type IMiddlewareError =
 /**
  * Request handler
  */
-export type IMiddewareHandler =
+export type IMiddlewareHandler =
     | IRequestHandler
     | IRequestHandler[];
 
