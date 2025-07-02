@@ -1,9 +1,9 @@
-import Loader from "../class/loader";
 import path from "path";
 import TreeLoader from "./tree.loader";
 import Pipe from "../class/pipe";
-import type { ILoadedModule, IMiddewareHandler, IPipeConstructor, IRequestHandler, IRouteFile } from "../types/types";
 import ModuleLoader from "../class/module.loader";
+import classUtil from "../utils/class";
+import type { ILoadedModule, IMiddewareHandler, IPipeConstructor, IRequestHandler } from "../types/types";
 
 /**
  * Pipe loader
@@ -19,18 +19,20 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
      * Tree loader
      */
     private treeLoader = new TreeLoader(this.server);
-    
+
     /**
      * Load pipes
      * @returns Pipes loaded
      */
     public async load(): Promise<ILoadedModule<Pipe>[]> {
+        // Time to init load
+        const initTime = Date.now();
         // Load tree info
         const tree = await this.treeLoader.load(this.pipes_dir, "pipe", this.server.mode);
 
         // Load constructors
         const pipesLoaded: ILoadedModule<Pipe>[] = [];
-        
+
         // Import all files
         await Promise.all(
             tree.paths.map(async (pipeFileItem) => {
@@ -41,11 +43,11 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                     let pipe: IPipeConstructor | undefined;
 
                     // Validate pipe valid
-                    if(modulePipe.default?.prototype instanceof Pipe) {
+                    if (modulePipe.default?.prototype instanceof Pipe) {
                         pipe = modulePipe.default;
                     }
-                    else if(
-                        modulePipe.default instanceof Array &&
+                    else if (
+                        modulePipe.default instanceof Array ||
                         typeof modulePipe.default === "function"
                     ) {
                         pipe = class extends Pipe {
@@ -54,11 +56,11 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                              * Request handlers
                              */
                             public handler: IMiddewareHandler = modulePipe.default;
-                            
+
                         };
                     }
 
-                    if(pipe) {
+                    if (pipe) {
                         try {
                             // Set property
                             Object.defineProperty(pipe, "name", {
@@ -69,40 +71,67 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                             // Create a new instance of pipe
                             const pipeInstance = new pipe(this.server);
 
-                            if(pipeInstance.handler instanceof Array) {
-                                for(let x = 0; x < pipeInstance.handler.length; x++) {
-                                    const handlerItem = pipeInstance.handler[x];
-
-                                    if(typeof handlerItem === 'function') {
-                                        if(handlerItem.length <= 3) {
-                                            // Append pipe founded
-                                            pipesLoaded.push({
-                                                status: "loaded",
-                                                module: pipeInstance,
-                                                route: pipeFileItem
-                                            });
-                                        }
-                                        else {
-                                            pipesLoaded.push({
-                                                status: "too-many-parameters-request-handler",
-                                                keyname: "handler",
-                                                route: pipeFileItem,
-                                                array: { index: x }
-                                            });
-                                        }
+                            // a utility for analyzing the structure of middleware
+                            const analize = (handlerItem: IRequestHandler, array?: { index: number }) => {
+                                if (typeof handlerItem === 'function') {
+                                    if (handlerItem.length <= 3) {
+                                        return true;
                                     }
                                     else {
                                         pipesLoaded.push({
-                                            status: "invalid-function-request-handler",
+                                            status: "too-many-parameters-request-handler",
                                             keyname: "handler",
                                             route: pipeFileItem,
-                                            array: { index: x }
+                                            array: array
                                         });
                                     }
                                 }
+                                else {
+                                    pipesLoaded.push({
+                                        status: "invalid-function-request-handler",
+                                        keyname: "handler",
+                                        route: pipeFileItem,
+                                        array: array
+                                    });
+                                }
+
+                                return false;
                             }
+
+                            if (pipeInstance.handler instanceof Array) {
+
+                                if(pipeInstance.handler.length) {
+                                    for (let x = 0; x < pipeInstance.handler.length; x++) {
+                                        const result = analize(pipeInstance.handler[x], { index: x });
+    
+                                        if(!result) return; // Exhaust outlet
+                                    }
+                                }
+                                else {
+                                    pipesLoaded.push({
+                                        status: "array-empty-request-handler",
+                                        keyname: "handler",
+                                        route: pipeFileItem
+                                    });
+                                    return;
+                                }
+
+                            }
+                            else {
+                                const result = analize(pipeInstance.handler);
+
+                                if(!result) return; // Exhaust outlet
+                            }
+
+                            // Append pipe founded
+                            pipesLoaded.push({
+                                status: "loaded",
+                                module: pipeInstance,
+                                route: pipeFileItem,
+                                loadTimeMs: Date.now() - initTime
+                            });
                         }
-                        catch(err) {
+                        catch (err) {
                             pipesLoaded.push({
                                 status: "constructor-error",
                                 route: pipeFileItem,
@@ -110,7 +139,7 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                             });
                         }
                     }
-                    else if (!modulePipe.default || (modulePipe.default instanceof Object && !Object.keys(modulePipe.default).length)) {
+                    else if (typeof modulePipe.default === "undefined" || (modulePipe.default && typeof modulePipe.default === "object" && !Object.keys(modulePipe.default).length) && !classUtil.isClass(modulePipe.default)) {
                         pipesLoaded.push({
                             status: "missing-default-export",
                             route: pipeFileItem
@@ -124,7 +153,7 @@ export default class PipesLoader extends ModuleLoader<Pipe> {
                         // console.log(`⚠️  The pipe '${pipeFileItem.relative}' must either extend the base Pipe class from @stexcore/api-engine or be a RequestHandler function (or an array of them).`);
                     }
                 }
-                catch(err) {
+                catch (err) {
                     pipesLoaded.push({
                         status: "failed-import",
                         route: pipeFileItem,

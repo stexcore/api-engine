@@ -9,7 +9,7 @@ export default class AuthService extends Service {
     /**
      * Load dependency service
      */
-    db = this.$(DbService);
+    db = this.$(DbService); // This is a circular reference
 
     /**
      * Try to authenticated using a unknow token

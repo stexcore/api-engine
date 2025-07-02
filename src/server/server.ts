@@ -1,4 +1,4 @@
-import type { IErrorRequestHandler, ILoadedModule, IMethod, IRequestHandler, IRouteFile, IServerConfig, IServiceConstructor } from "../types/types";
+import type { ILoadedModule, IMethod, IServerConfig, IServiceConstructor } from "../types/types";
 import Service from "../class/service";
 import express from "express";
 import http from "http";
@@ -10,7 +10,6 @@ import schemaMiddleware from "../middlewares/schema.middleware";
 import catchHttpErrorMiddleware from "../middlewares/catchHttpError.middleware";
 import catchGlobalErrorMiddleware from "../middlewares/catchGlobalError.middleware";
 import PipesLoader from "../core/pipe.loader";
-import "colors";
 import Middleware from "../class/middleware";
 import Pipe from "../class/pipe";
 import Schema from "../class/schema";
@@ -19,6 +18,8 @@ import { methods } from "../constants/method.constant";
 import { promisify } from "util";
 import { Socket } from "net";
 import logger from "../utils/logger";
+import { RegisterCreatingServiceSymbol, UnregisterCreatingServiceSymbol } from "../symbols/server.symbols";
+import "colors";
 
 /**
  * Server instance
@@ -66,6 +67,11 @@ export default class Server {
     public readonly mode: "compact" | "tree";
 
     /**
+     * Prevent circular service
+     */
+    public readonly allow_circular_service_deps: boolean;
+
+    /**
      * Is Compact mode
      */
     public get isCompact() {
@@ -94,7 +100,10 @@ export default class Server {
     /**
      * Creating constructors services
      */
-    private creating_constructors_services: IServiceConstructor[] = [];
+    private creating_constructors_services: {
+        constructor: IServiceConstructor,
+        service: Service
+    }[] = [];
 
     /**
      * All abort controllers to abort initializing server
@@ -115,6 +124,7 @@ export default class Server {
         this.port = config.port;
         this.workdir = config.workdir;
         this.mode = config.mode || "compact";
+        this.allow_circular_service_deps = config.allowCircularServiceDeps ?? false;
         this.running = false;
     }
 
@@ -154,13 +164,7 @@ export default class Server {
                 services.push(serviceItem);
             }
             catch (err) {
-                if (err instanceof this.CircularError) {
-                    console.log(err);
-                }
-                else {
-                    console.log(err);
-                    console.log("❌ Failed to load service:    /" + constructorServiceItem.name);
-                }
+                throw err;
             }
         }
 
@@ -182,20 +186,14 @@ export default class Server {
 
         if (!serviceItem) {
             // Find circular creating
-            const index = this.creating_constructors_services.findIndex((ccs) => ccs.prototype instanceof constructorService);
+            const index = this.creating_constructors_services.findIndex((ccs) => ccs.constructor === constructorService);
 
             if (index === -1) {
-                // Add creating instance
-                this.creating_constructors_services.push(constructorService);
                 // append new instance service
                 this.services.push(serviceItem = {
                     service: new constructorService(this),
                     dynamic: dynamic
                 });
-                // Clean creating instance
-                this.creating_constructors_services = this.creating_constructors_services.filter((ccs) => (
-                    ccs !== constructorService
-                ));
 
                 // Try to init service
                 try {
@@ -208,15 +206,23 @@ export default class Server {
                     console.error(err);
                 }
 
-                console.log("✅ Service loaded:    " + constructorService.name.yellow);
+                logger.ok("Service loaded", constructorService.name.cyan);
             }
             else {
-                // Get circular error
-                const constructorBase = this.creating_constructors_services[index];
-                const constructorConflict = this.creating_constructors_services[this.creating_constructors_services.length - 2] || constructorBase;
-
-                // Throw circular error
-                throw new this.CircularError(`❌ Circular dependency detected: '${constructorBase.name}' depends on '${constructorConflict.name}', creating an infinite loop.`)
+                if(this.allow_circular_service_deps) {
+                    serviceItem = {
+                        dynamic: dynamic,
+                        service: this.creating_constructors_services[index].service
+                    };
+                }
+                else {
+                    // Get circular error
+                    const constructorBase = this.creating_constructors_services[index];
+                    const constructorConflict = this.creating_constructors_services[this.creating_constructors_services.length - 1] || constructorBase;
+    
+                    // Throw circular error
+                    throw new this.CircularError(`Circular dependency detected: '${constructorBase.constructor.name}' depends on '${constructorConflict.constructor.name}', creating an infinite loop. Alternatively, you can enable the setting using 'allowCircularServiceDeps', although you should be aware that importing services circularly may cause unexpected behavior.`)
+                }
             }
         }
 
@@ -228,11 +234,11 @@ export default class Server {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public getService<S extends Service>(service: IServiceConstructor): S {
+    public getService<S extends Service>(service: IServiceConstructor<S>): S {
 
         // Validate service extended
         if (!(service.prototype instanceof Service)) {
-            throw new Error("❌ The service '" + (service?.name || "unknown") + "' does not extend the base Service class from @stexcore/api-engine.");
+            throw new Error("The service '" + (service?.name || "unknown") + "' does not extend the base Service class from @stexcore/api-engine.");
         }
 
         // Find instance service
@@ -246,9 +252,22 @@ export default class Server {
                 return this.createService(constructor.constructor, constructor.dynamic).service as S;
             }
 
-            throw new Error("❌ The service '" + service.name + "' is'nt registered! Services should be placed inside the dedicated 'services' folder within your project's resources.");
+            throw new Error("The service '" + service.name + "' is'nt registered! Services should be placed inside the dedicated 'services' folder within your project's resources.");
         }
         return serviceItem.service as S;
+    }
+
+    public [RegisterCreatingServiceSymbol](service: Service) {
+        this.creating_constructors_services.push({
+            service: service,
+            constructor: service.constructor as IServiceConstructor
+        });
+    }
+
+    public [UnregisterCreatingServiceSymbol](service: Service) {
+        this.creating_constructors_services = this.creating_constructors_services.filter((servItem) => (
+            servItem.service !== service
+        ));
     }
 
     /**
@@ -256,6 +275,9 @@ export default class Server {
      */
     public async initialize() {
 
+        // Time to init load
+        const initTime = Date.now();
+        
         // Validate if it is running right now
         if (this.running) {
             throw new Error("The server is running right now!");
@@ -325,6 +347,8 @@ export default class Server {
             // Log server started
             console.log("\n  Server started on: http://localhost:" + this.port + "\n");
         });
+
+        return Date.now() - initTime;
     }
 
     /**
@@ -398,6 +422,21 @@ export default class Server {
         let schemas: ILoadedModule<Schema>[];
         let controllers: ILoadedModule<Controller>[];
 
+        const segments: {
+            [path: string]: {
+                controller?: ILoadedModule<Controller>,
+                middleware?: ILoadedModule<Middleware>,
+                pipe?: ILoadedModule<Pipe>,
+                schema?: ILoadedModule<Schema>
+            }
+        } = {};
+        
+        const getSegmentInfo = (segment: string) => {
+            if(!segments[segment]) segments[segment] = {};
+
+            return segments[segment];
+        }
+
         /*******************************************************
          * Load services section
          ******************************************************/
@@ -416,17 +455,19 @@ export default class Server {
                     break;
 
                 case "failed-import":
-                    logger.error("Faile to import the service", service.route.relative.cyan);
+                    logger.error("Faile to import the service", service.route.relative.cyan, "Reason:\n", service.error);
                     break;
 
                 case "missing-default-export":
                     logger.error("Missing the default export on the service", service.route.relative.cyan);
+                    break;
 
                 case "not-extends-valid-class":
                     logger.error("The export does'nt extends the Service class on the export", service.route.relative.cyan);
+                    break;
 
                 default:
-                    logger.warm("Unhandle error of type '" + service.status.magenta + "'");
+                    logger.warm("Unhandle error of type '" + service.status.magenta + "'", service.route.relative.cyan);
             }
         }
 
@@ -442,6 +483,12 @@ export default class Server {
                 case "loaded":
                     const handlers = pipe.module.handler instanceof Array ? pipe.module.handler : [pipe.module.handler];
 
+                    // Get segment info
+                    const segmentInfo = getSegmentInfo(pipe.route.flat_segments_express);
+
+                    // Append pipe loaded
+                    segmentInfo.pipe = pipe;
+                    
                     // Append request handlers (pipes)
                     this.app.use(pipe.route.flat_segments_express, ...handlers.map((handler) => (
                         handler.bind(pipe.module)
@@ -449,29 +496,35 @@ export default class Server {
                     break;
 
                 case "too-many-parameters-request-handler":
-                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function has more than three parameters, suggesting that it is not a valid request handler.`)
+                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function has more than three parameters, suggesting that it is not a valid request handler.`, pipe.route.relative.cyan)
                     break;
 
                 case "invalid-function-request-handler":
-                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function is not valid`);
+                    logger.error(`The pipe.${pipe.keyname}${pipe.array ? `[${pipe.array.index}]` : ""} function is not valid`, pipe.route.relative.cyan);
+                    break;
+
+                case "array-empty-request-handler":
+                    logger.error(`The pipe.${pipe.keyname} array is empty`, pipe.route.relative.cyan);
                     break;
 
                 case "constructor-error":
-                    logger.error("Error thrown while constructing the pipe instance", pipe.route.relative.cyan);
+                    logger.error("Error thrown while constructing the pipe instance", pipe.route.relative.cyan, "Reason:\n", pipe.error);
                     break;
 
                 case "failed-import":
-                    logger.error("Faile to import the pipe", pipe.route.relative.cyan);
+                    logger.error("Faile to import the pipe", pipe.route.relative.cyan, "Reason:\n", pipe.error);
                     break;
 
                 case "missing-default-export":
                     logger.error("Missing the default export on the pipe", pipe.route.relative.cyan);
+                    break;
 
                 case "not-extends-valid-class":
                     logger.error("The export does'nt extends the Pipe class on the export", pipe.route.relative.cyan);
+                    break;
 
                 default:
-                    logger.warm("Unhandle error of type '" + pipe.status.magenta + "'");
+                    logger.warm("Unhandle error of type '" + pipe.status.magenta + "'", pipe.route.relative.cyan);
             }
         }
 
@@ -502,14 +555,20 @@ export default class Server {
                             );
                         }
                     }
+
+                    // Get segment info
+                    const segmentInfo = getSegmentInfo(schema.route.flat_segments_express);
+
+                    // Append schema loaded
+                    segmentInfo.schema = schema;
                     break;
 
                 case "invalid-type-schema-request":
-                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' has an invalid type '${schema.type_received}'`);
+                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' has an invalid type '${schema.type_received}'`, schema.route.relative.cyan);
                     break;
 
                 case "missing-joi-schemas":
-                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' doesn't has a validation using 'body', 'headers', 'params' or 'query'.`);
+                    logger.error(`The ${schema.method} method schema on '${schema.route.flat_segments}' doesn't has a validation using 'body', 'headers', 'params' or 'query'.`, schema.route.relative.cyan);
                     break;
 
                 case "missing-some-member-declaration":
@@ -517,156 +576,291 @@ export default class Server {
                     break;
 
                 case "constructor-error":
-                    logger.error("Error thrown while constructing the schema instance", schema.route.relative.cyan);
+                    logger.error("Error thrown while constructing the schema instance", schema.route.relative.cyan, "Reason:\n", schema.error);
                     break;
 
                 case "failed-import":
-                    logger.error("Faile to import the schema", schema.route.relative.cyan);
+                    logger.error("Faile to import the schema", schema.route.relative.cyan, "Reason:\n", schema.error);
                     break;
 
                 case "missing-default-export":
                     logger.error("Missing the default export on the schema", schema.route.relative.cyan);
+                    break;
 
                 case "not-extends-valid-class":
                     logger.error("The export does'nt extends the Schema class on the export", schema.route.relative.cyan);
+                    break;
 
                 default:
-                    logger.warm("Unhandle error of type '" + schema.status.magenta + "'");
+                    logger.warm("Unhandle error of type '" + schema.status.magenta + "'", schema.route.relative.cyan);
             }
         }
 
         // Load middlewares
         yield middlewares = await middlewaresLoader.load();
+        
+        // Traverse all middlewares
+        for(const middleware of middlewares) {
+            switch (middleware.status) {
+                case "loaded":
+                    const handlers = middleware.module.handler instanceof Array ? middleware.module.handler : middleware.module.handler ? [middleware.module.handler] : [];
+                    
+                    if(handlers.length) {
+                        // Get segment info
+                        const segmentInfo = getSegmentInfo(middleware.route.flat_segments_express);
+                        // Append middleware loaded
+                        segmentInfo.middleware = middleware;
+                        // Append request handlers (middlewares)
+                        this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
+                            handler.bind(middleware.module)
+                        )));
+                    }
+                    break;
+
+                case "missing-some-member-declaration":
+                    logger.error("Middleware must define at least a 'handler' or an 'error' function", middleware.route.relative.cyan);
+                    break;
+
+                case "too-many-parameters-request-handler":
+                    if(middleware.keyname === "handler") {
+                        logger.error(`The middleware.${middleware.keyname}${middleware.array ? `[${middleware.array.index}]` : ""} function has more than three parameters, suggesting that it is not a valid request handler.`, middleware.route.relative.cyan)
+                    }
+                    else {
+                        logger.error(`The middleware.${middleware.keyname}${middleware.array ? `[${middleware.array.index}]` : ""} must accept exactly four parameters to be a valid error handler`, middleware.route.relative.cyan);
+                    }
+                    break;
+
+                case "invalid-function-request-handler":
+                    logger.error(`The middleware.${middleware.keyname}${middleware.array ? `[${middleware.array.index}]` : ""} function is not valid`, middleware.route.relative.cyan);
+                    break;
+
+                case "constructor-error":
+                    logger.error("Error thrown while constructing the middleware instance", middleware.route.relative.cyan, "Reason:\n", middleware.error);
+                    break;
+
+                case "failed-import":
+                    logger.error("Faile to import the middleware", middleware.route.relative.cyan, "Reason:\n", middleware.error);
+                    break;
+
+                case "missing-default-export":
+                    logger.error("Missing the default export on the middleware", middleware.route.relative.cyan);
+
+                case "not-extends-valid-class":
+                    logger.error("The export does'nt extends the Middleware class on the export", middleware.route.relative.cyan);
+
+                default:
+                    logger.warm("Unhandle error of type '" + middleware.status.magenta + "'", middleware.route.relative.cyan);
+            }
+        }
 
         // Load controllers
         yield controllers = await controllersLoader.load();
 
-        // interrupt process if it was aborted
-        if (abortSignal.aborted) return;
-
-        // Traverse all middlewares
-        for (const middleware of middlewares) {
-            // All requests handler
-            const handlers: IRequestHandler[] = [];
-
-            // Validate multiples middlewares
-            if (middleware.middleware.handler instanceof Array) {
-                if (middleware.middleware.handler.length) {
-                    for (let x = 0; x < middleware.middleware.handler.length; x++) {
-                        const requestHandler = middleware.middleware.handler[x];
-
-                        if (typeof requestHandler === "function") {
-                            handlers.push(requestHandler);
-                        }
-                        else {
-                            console.log(`⚠️  The middleware.handler[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
-                        }
-                    }
-                }
-                else {
-                    console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
-                }
-            }
-            else if (typeof middleware.middleware.handler === "function") {
-                handlers.push(middleware.middleware.handler);
-            }
-            else if (middleware.middleware.handler) {
-                console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.handler}'`);
-            }
-            else if (
-                !(middleware.middleware.errors instanceof Array) &&
-                !("errors" in middleware.middleware)
-            ) {
-                console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
-            }
-
-            if (handlers.length) {
-                // Append request handlers (middlewares)
-                this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
-                    handler.bind(middleware.middleware)
-                )));
-
-                console.log("✅ Middleware loaded: " + middleware.route.flat_segments.cyan);
-            }
-        }
-
         // Traverse all controllers
-        for (const controller of controllers) {
-            const methods_loaded: IMethod[] = [];
+        for(const controller of controllers) {
+            switch (controller.status) {
+                case "loaded":
+                    for(const method in methods) {
+                        const controllerMethod = controller.module[method as IMethod];
 
-            // Traverse all methods
-            for (const method in methods) {
-
-                // Get method function
-                const controllerMethod = controller.controller[method as IMethod];
-
-                // Validate method into controller
-                if (typeof controllerMethod === "function") {
-                    // Append method loaded
-                    methods_loaded.push(method as IMethod);
-
-                    // Append request handler
-                    this.app.use(
-                        controller.route.flat_segments_express,
-                        controllerMethod!.bind(controller.controller)
-                    );
-                }
-                else if (controllerMethod) {
-                    console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' has an invalid type '${typeof controllerMethod}'`);
-                }
-                else if (method in controller.controller) {
-                    console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' is empty`);
-                }
-            }
-
-            if (methods_loaded) {
-                console.log(
-                    "✅ Controller loaded: " + controller.route.flat_segments.cyan,
-                    methods_loaded.map((m) => (
-                        methods[m]
-                    )).join(",")
-                );
-            }
-        }
-
-        // Traverse all middlewares to append errors requests handlers
-        for (const middleware of middlewares) {
-            // All requests handler
-            const handlers: IErrorRequestHandler[] = [];
-
-            // Validate multiples middlewares
-            if (middleware.middleware.errors instanceof Array) {
-                if (middleware.middleware.errors.length) {
-                    for (let x = 0; x < middleware.middleware.errors.length; x++) {
-                        const requestHandler = middleware.middleware.errors[x];
-
-                        if (typeof requestHandler === "function") {
-                            handlers.push(requestHandler);
-                        }
-                        else {
-                            console.log(`⚠️  The middleware.errors[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+                        if(controllerMethod) {
+                            // Get segment info
+                            const segmentInfo = getSegmentInfo(controller.route.flat_segments_express);
+                            // Append controller loaded
+                            segmentInfo.controller = controller;
+                            // Append request handlers (controllers)
+                            this.app[method.toLowerCase() as Lowercase<IMethod>](controller.route.flat_segments_express, controllerMethod.bind(controller.module));
                         }
                     }
-                }
-                else {
-                    console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' is empty!`);
-                }
-            }
-            else if (typeof middleware.middleware.errors === "function") {
-                handlers.push(middleware.middleware.errors);
-            }
-            else if (middleware.middleware.errors) {
-                console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.errors}'`);
-            }
 
-            if (handlers.length) {
-                // Append request handlers (middlewares)
-                this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
-                    handler.bind(middleware.middleware)
-                )));
+                    // Get segment info
+                    const segmentInfo = getSegmentInfo(controller.route.flat_segments_express);
 
-                console.log("✅ CatchError loaded: " + middleware.route.flat_segments.cyan);
+                    // Append controller loaded
+                    segmentInfo.controller = controller;
+                    break;
+
+                case "too-many-parameters-request-handler":
+                    logger.error(`The controller.${controller.keyname}${controller.array ? `[${controller.array.index}]` : ""} function has more than three parameters, suggesting that it is not a valid request handler.`, controller.route.relative.cyan)
+                    break;
+
+                case "invalid-function-request-handler":
+                    logger.error(`The controller.${controller.keyname}${controller.array ? `[${controller.array.index}]` : ""} function is not valid`, controller.route.relative.cyan);
+                    break;
+
+                case "missing-some-member-declaration":
+                    logger.error("No HTTP methods (GET, POST, etc.) defined in controller", controller.route.relative.cyan);
+                    break;
+
+                case "constructor-error":
+                    logger.error("Error thrown while constructing the controller instance", controller.route.relative.cyan, "Reason:\n", controller.error);
+                    break;
+
+                case "failed-import":
+                    logger.error("Faile to import the controller", controller.route.relative.cyan, "Reason:\n", controller.error);
+                    break;
+
+                case "missing-default-export":
+                    logger.error("Missing the default export on the controller", controller.route.relative.cyan);
+                    break;
+
+                case "not-extends-valid-class":
+                    logger.error("The export does'nt extends the Controller class on the export", controller.route.relative.cyan);
+                    break;
+
+                default:
+                    logger.warm("Unhandle error of type '" + controller.status.magenta + "'", controller.route.relative.cyan);
             }
+        }
+        
+        // // interrupt process if it was aborted
+        // if (abortSignal.aborted) return;
+
+        // // Traverse all middlewares
+        // for (const middleware of middlewares) {
+        //     // All requests handler
+        //     const handlers: IRequestHandler[] = [];
+
+        //     // Validate multiples middlewares
+        //     if (middleware.middleware.handler instanceof Array) {
+        //         if (middleware.middleware.handler.length) {
+        //             for (let x = 0; x < middleware.middleware.handler.length; x++) {
+        //                 const requestHandler = middleware.middleware.handler[x];
+
+        //                 if (typeof requestHandler === "function") {
+        //                     handlers.push(requestHandler);
+        //                 }
+        //                 else {
+        //                     console.log(`⚠️  The middleware.handler[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+        //                 }
+        //             }
+        //         }
+        //         else {
+        //             console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
+        //         }
+        //     }
+        //     else if (typeof middleware.middleware.handler === "function") {
+        //         handlers.push(middleware.middleware.handler);
+        //     }
+        //     else if (middleware.middleware.handler) {
+        //         console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.handler}'`);
+        //     }
+        //     else if (
+        //         !(middleware.middleware.errors instanceof Array) &&
+        //         !("errors" in middleware.middleware)
+        //     ) {
+        //         console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
+        //     }
+
+        //     if (handlers.length) {
+        //         // Append request handlers (middlewares)
+        //         this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
+        //             handler.bind(middleware.middleware)
+        //         )));
+
+        //         console.log("✅ Middleware loaded: " + middleware.route.flat_segments.cyan);
+        //     }
+        // }
+
+        // // Traverse all controllers
+        // for (const controller of controllers) {
+        //     const methods_loaded: IMethod[] = [];
+
+        //     // Traverse all methods
+        //     for (const method in methods) {
+
+        //         // Get method function
+        //         const controllerMethod = controller.controller[method as IMethod];
+
+        //         // Validate method into controller
+        //         if (typeof controllerMethod === "function") {
+        //             // Append method loaded
+        //             methods_loaded.push(method as IMethod);
+
+        //             // Append request handler
+        //             this.app.use(
+        //                 controller.route.flat_segments_express,
+        //                 controllerMethod!.bind(controller.controller)
+        //             );
+        //         }
+        //         else if (controllerMethod) {
+        //             console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' has an invalid type '${typeof controllerMethod}'`);
+        //         }
+        //         else if (method in controller.controller) {
+        //             console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' is empty`);
+        //         }
+        //     }
+
+        //     if (methods_loaded) {
+        //         console.log(
+        //             "✅ Controller loaded: " + controller.route.flat_segments.cyan,
+        //             methods_loaded.map((m) => (
+        //                 methods[m]
+        //             )).join(",")
+        //         );
+        //     }
+        // }
+
+        // // Traverse all middlewares to append errors requests handlers
+        // for (const middleware of middlewares) {
+        //     // All requests handler
+        //     const handlers: IErrorRequestHandler[] = [];
+
+        //     // Validate multiples middlewares
+        //     if (middleware.middleware.errors instanceof Array) {
+        //         if (middleware.middleware.errors.length) {
+        //             for (let x = 0; x < middleware.middleware.errors.length; x++) {
+        //                 const requestHandler = middleware.middleware.errors[x];
+
+        //                 if (typeof requestHandler === "function") {
+        //                     handlers.push(requestHandler);
+        //                 }
+        //                 else {
+        //                     console.log(`⚠️  The middleware.errors[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
+        //                 }
+        //             }
+        //         }
+        //         else {
+        //             console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' is empty!`);
+        //         }
+        //     }
+        //     else if (typeof middleware.middleware.errors === "function") {
+        //         handlers.push(middleware.middleware.errors);
+        //     }
+        //     else if (middleware.middleware.errors) {
+        //         console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.errors}'`);
+        //     }
+
+        //     if (handlers.length) {
+        //         // Append request handlers (middlewares)
+        //         this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
+        //             handler.bind(middleware.middleware)
+        //         )));
+
+        //         console.log("✅ CatchError loaded: " + middleware.route.flat_segments.cyan);
+        //     }
+        // }
+
+        for(const pathItem in segments) {
+            const segmentItem = segments[pathItem];
+
+            const timing = [
+                ...(segmentItem.pipe && segmentItem.pipe.status === "loaded" ? [segmentItem.pipe.loadTimeMs] as const : []),
+                ...(segmentItem.middleware && segmentItem.middleware.status === "loaded" ? [segmentItem.middleware.loadTimeMs] as const : []),
+                ...(segmentItem.controller && segmentItem.controller.status === "loaded" ? [segmentItem.controller.loadTimeMs] as const : []),
+                ...(segmentItem.schema && segmentItem.schema.status === "loaded" ? [segmentItem.schema.loadTimeMs] as const : []),
+            ];
+
+            logger.loaded(
+                pathItem, 
+                [
+                    ...(segmentItem.pipe ? ["pipe"] as const : []),
+                    ...(segmentItem.middleware ? ["middleware"] as const : []),
+                    ...(segmentItem.controller ? ["controller"] as const : []),
+                    ...(segmentItem.schema ? ["schema"] as const : []),
+                ],
+                timing.reduce((t, v) => t + v, 0) / timing.length
+            );
         }
 
         // Append default middlewares

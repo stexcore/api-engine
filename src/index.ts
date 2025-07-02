@@ -1,4 +1,4 @@
-import type { ISchema, IServerConfig, IMethod, ISchemaRequest, IRequestHandler, IErrorRequestHandler, IApplication, IMiddlewareError, IMiddewareHandler } from "./types/types";
+import type { ISchema, IServerConfig, IMethod, ISchemaRequest, IRequestHandler, IErrorRequestHandler, IApplication, IMiddlewareError, IMiddewareHandler, ISchemaConstructor } from "./types/types";
 import Server from "./server/server";
 import Schema from "./class/schema";
 import Controller from "./class/controller";
@@ -23,16 +23,28 @@ function createServer(config: IServerConfig) {
  * @param schema Schema structure
  * @returns Schema instance
  */
-function createSchema(schema: ISchema) {
-    const schemaInstance = new Schema();
+function createSchema(schema: ISchema): ISchemaConstructor {
 
-    // Append schema validation
-    for(const key in schema) {
-        // Schema method instance
-        schemaInstance[key as keyof ISchema] = schema[key as keyof ISchema];
+    // Extract a copy of  schema
+    const schemaInfo: ISchema = {
+        ...schema
+    };
+    
+    // Return a schema constructor
+    return class extends Schema {
+
+        // Initialize the schema
+        constructor(server: Server) {
+            super(server);
+            
+            // Append schema validation
+            for(const key in schemaInfo) {
+                // Schema method instance
+                this[key as keyof ISchema] = schemaInfo[key as keyof ISchema];
+            }
+        }
+        
     }
-
-    return schemaInstance;
 }
 
 /**

@@ -2,7 +2,7 @@ import { ISchemaRequest, Schema } from "../../../src";
 
 
 export default class AuthSchema extends Schema {
-
+    
     /**
      * Validation schema into method POST
      */

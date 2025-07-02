@@ -1,5 +1,4 @@
-import { RequestHandler } from "express";
-import { Controller } from "../../../src";
+import { Controller, IRequestHandler } from "../../../src";
 
 /**
  * Authentication segment
@@ -12,7 +11,7 @@ export default class AuthController extends Controller {
      * @param res Response utils
      * @param next Next middleware
      */
-    public GET?: RequestHandler = (req, res, next) => {
+    public GET?: IRequestHandler = (req, res, next) => {
         try {
             res.json({
                 success: true,

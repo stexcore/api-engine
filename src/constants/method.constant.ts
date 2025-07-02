@@ -1,4 +1,4 @@
-import { IMethod } from "../types/types";
+import type { IMethod } from "../types/types";
 
 /**
  * All methods

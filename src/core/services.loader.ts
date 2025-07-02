@@ -2,6 +2,7 @@ import path from "path";
 import Service from "../class/service";
 import TreeLoader from "./tree.loader";
 import ModuleLoader from "../class/module.loader";
+import classUtil from "../utils/class";
 import type { ILoadedModule, IServiceConstructor } from "../types/types";
 
 /**
@@ -24,6 +25,8 @@ export default class ServicesLoader extends ModuleLoader<IServiceConstructor> {
      * @returns All controllers
      */
     public async load(): Promise<ILoadedModule<IServiceConstructor>[]> {
+        // Time to init load
+        const initTime = Date.now();
         // Load tree info
         const tree = await this.treeLoader.load(this.services_dir, "service", "compact");
 
@@ -43,33 +46,31 @@ export default class ServicesLoader extends ModuleLoader<IServiceConstructor> {
                             writable: true,
                             value: serviceFileItem.relative
                         });
-                        serviceConstructorsLoaded.push({
+                        return serviceConstructorsLoaded.push({
                             status: "loaded",
                             module: moduleService.default,
-                            route: serviceFileItem
+                            route: serviceFileItem,
+                            loadTimeMs: Date.now() - initTime
                         });
                     }
-                    else if (!moduleService.default || (moduleService.default instanceof Object && !Object.keys(moduleService.default).length)) {
-                        serviceConstructorsLoaded.push({
+                    else if (typeof moduleService.default === "undefined" || (moduleService.default && typeof moduleService.default === "object" && !Object.keys(moduleService.default).length) && !classUtil.isClass(moduleService.default)) {
+                        return serviceConstructorsLoaded.push({
                             status: "missing-default-export",
                             route: serviceFileItem
                         });
-                        // console.log(`⚠️  The service '${serviceFileItem.relative}' is missing a default export of a class that extends the base Service class from @stexcore/api-engine.`);
                     } else {
-                        serviceConstructorsLoaded.push({
+                        return serviceConstructorsLoaded.push({
                             status: "not-extends-valid-class",
                             route: serviceFileItem
                         });
-                        // console.log(`⚠️  The service '${serviceFileItem.relative}' does not extend the base Service class from @stexcore/api-engine.`);
                     }
                 }
                 catch(err) {
-                    serviceConstructorsLoaded.push({
+                    return serviceConstructorsLoaded.push({
                         status: "failed-import",
                         route: serviceFileItem,
                         error: err
                     });
-                    // throw new Error(`❌ Failed to load service: '${serviceFileItem.relative}'`);
                 }
             })
         );

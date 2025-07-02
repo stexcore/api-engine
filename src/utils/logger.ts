@@ -3,6 +3,7 @@ import "colors";
 
 // Tipos posibles de módulos que se pueden registrar como parte del sistema
 type IModule = 
+    | "controller"
     | "middleware"
     | "schema"
     | "catch-error"
@@ -14,21 +15,21 @@ export default new class Logger {
     /**
      * Imprime un mensaje de éxito (color verde)
      */
-    public ok(...messages: string[]) {
+    public ok(...messages: unknown[]) {
         console.log("[OK]".green, ...messages);
     }
 
     /**
      * Imprime una advertencia (color amarillo)
      */
-    public warm(...messages: string[]) {
+    public warm(...messages: unknown[]) {
         console.log("[WARM]".yellow, ...messages);
     }
 
     /**
      * Imprime un mensaje de error (color rojo)
      */
-    public error(...messages: string[]) {
+    public error(...messages: unknown[]) {
         console.log("[ERROR]".red, ...messages);
     }
 
@@ -44,11 +45,12 @@ export default new class Logger {
         
         // Imprime la línea resumen con formato fijo para la ruta
         this.ok(
-            path.padEnd(80, " "), "→", // Rellena a 80 caracteres para alinear las columnas
+            path.padEnd(40, " ").cyan, "→", // Rellena a 80 caracteres para alinear las columnas
             ...[
                 ...(modules.has("pipe") ? ["pipe".green] : []),
                 ...(modules.has("schema") ? ["schema".cyan] : []),
                 ...(modules.has("middleware") ? ["middleware".magenta] : []),
+                ...(modules.has("controller") ? ["controller".green] : []),
                 ...(modules.has("catch-error") ? ["catch-error".red] : []),
             ],
             `(${miliseconds}ms)` // Tiempo total en milisegundos

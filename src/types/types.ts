@@ -27,13 +27,14 @@ export type ISegment =
 
 export type ILoadedModule<T> = 
     { route: IRouteFile } & (
-        | { status: "loaded", module: T }
+        | { status: "loaded", module: T, loadTimeMs: number }
         | { status: "missing-default-export" }
         | { status: "not-extends-valid-class" }
         | { status: "failed-import", error: unknown }
         | { status: "constructor-error", error: unknown }
-        | { status: "invalid-function-request-handler", keyname: "handler" | "error", array?: { index: number } }
-        | { status: "too-many-parameters-request-handler", keyname: "handler" | "error", array?: { index: number } }
+        | { status: "array-empty-request-handler", keyname: "handler" | "error" }
+        | { status: "invalid-function-request-handler", keyname: "handler" | "error" | IMethod, array?: { index: number } }
+        | { status: "too-many-parameters-request-handler", keyname: "handler" | "error" | IMethod, array?: { index: number } }
         | { status: "missing-joi-schemas", method: IMethod }
         | { status: "invalid-type-schema-request", type_received: string, method: IMethod }
         | { status: "missing-some-member-declaration" }
@@ -54,7 +55,11 @@ export interface IServerConfig {
     /**
      * Load mode
      */
-    mode?: "compact" | "tree"
+    mode?: "compact" | "tree",
+    /**
+     * Allow circular dependencies between services
+     */
+    allowCircularServiceDeps?: boolean   
 }
 
 /**
@@ -244,7 +249,7 @@ export type IMiddewareHandler =
 /**
  * Service constructor
  */
-export type IServiceConstructor = new (server: Server) => Service;
+export type IServiceConstructor<S extends Service = Service> = new (server: Server) => S;
 
 /**
  * Middleware constructor

@@ -19,7 +19,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public getService<S extends Service>(service: IServiceConstructor): S {
+    public getService<S extends Service>(service: IServiceConstructor<S>): S {
         return this.server.getService<S>(service);
     }
 
@@ -28,7 +28,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public service$<S extends Service>(service: IServiceConstructor): S {
+    public service$<S extends Service>(service: IServiceConstructor<S>): S {
         return this.server.getService<S>(service);
     }
 
@@ -37,7 +37,7 @@ export class Piece {
      * @param service Service Constructor
      * @returns Service instance
      */
-    public $<S extends Service>(service: IServiceConstructor): S {
+    public $<S extends Service>(service: IServiceConstructor<S>): S {
         return this.server.getService<S>(service);
     }
     

@@ -1,10 +1,10 @@
 import path from "path";
 import Schema from "../class/schema";
 import TreeLoader from "./tree.loader";
-import type { ILoadedModule, IMethod, ISchemaConstructor, ISchemaRequest } from "../types/types";
 import ModuleLoader from "../class/module.loader";
 import { methods } from "../constants/method.constant";
 import Joi from "joi";
+import type { ILoadedModule, IMethod, ISchemaRequest } from "../types/types";
 
 /**
  * Schema loader
@@ -27,6 +27,8 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
      */
     public async load(): Promise<ILoadedModule<Schema>[]> {
 
+        // Time to init load
+        const initTime = Date.now();
         // Load tree info
         const tree = await this.treeLoader.load(this.schemas_dir, "schema", this.server.mode);
 
@@ -72,6 +74,7 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
                                                 method: method as IMethod,
                                                 route: schemaFileItem
                                             });
+                                            return; // Exhaust outlet
                                         }
                                     }
                                     else if(typeof methodSchemaInstance !== "undefined") {
@@ -81,6 +84,7 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
                                             method: method as IMethod,
                                             route: schemaFileItem
                                         });
+                                        return; // Exhaust outlet
                                     }
                                     else delete schemaInstance[method];
                                 }
@@ -90,7 +94,8 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
                                 schemasLoaded.push({
                                     status: "loaded",
                                     module: schemaInstance,
-                                    route: schemaFileItem
+                                    route: schemaFileItem,
+                                    loadTimeMs: Date.now() - initTime
                                 });
                             }
                             else {
@@ -109,7 +114,7 @@ export default class SchemasLoader extends ModuleLoader<Schema> {
                             });
                         }
                     }
-                    else if (!moduleSchema.default || (moduleSchema.default instanceof Object && !Object.keys(moduleSchema.default).length)) {
+                    else if (typeof moduleSchema.default === "undefined" || (moduleSchema.default && typeof moduleSchema.default === "object" && !Object.keys(moduleSchema.default).length)) {
                         // Append missing default export
                         schemasLoaded.push({
                             status: "missing-default-export",
