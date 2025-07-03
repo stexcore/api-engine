@@ -87,7 +87,7 @@ export default class ControllersLoader extends LoaderModule<Controller> {
                                 // Try to create a new instance
                                 controllersLoaded.push({
                                     status: "loaded",
-                                    module: new moduleController.constructor(this.server),
+                                    module: controllerInstance,
                                     route: controllerFileItem,
                                     loadTimeMs: Date.now() - initTime
                                 });

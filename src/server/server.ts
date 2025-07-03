@@ -662,12 +662,8 @@ export default class Server {
                 case "loaded":
                     for(const method in methods) {
                         const controllerMethod = controller.module[method as IMethod];
-
+                        
                         if(controllerMethod) {
-                            // Get segment info
-                            const segmentInfo = getSegmentInfo(controller.route.flat_segments_express);
-                            // Append controller loaded
-                            segmentInfo.controller = controller;
                             // Append request handlers (controllers)
                             this.app[method.toLowerCase() as Lowercase<IMethod>](controller.route.flat_segments_express, controllerMethod.bind(controller.module));
                         }
