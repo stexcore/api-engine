@@ -31,7 +31,7 @@ export default class BaseMiddleware extends Middleware {
         }
     };
 
-    public errors?: IMiddlewareError = (err, req, res, next) => {
+    public error?: IMiddlewareError = (err, req, res, next) => {
         console.error(err);
         next(err);
     }

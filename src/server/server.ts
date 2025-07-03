@@ -708,134 +708,25 @@ export default class Server {
                     logger.warm("Unhandle error of type '" + controller.status.magenta + "'", controller.route.relative.cyan);
             }
         }
-        
-        // // interrupt process if it was aborted
-        // if (abortSignal.aborted) return;
 
-        // // Traverse all middlewares
-        // for (const middleware of middlewares) {
-        //     // All requests handler
-        //     const handlers: IRequestHandler[] = [];
-
-        //     // Validate multiples middlewares
-        //     if (middleware.middleware.handler instanceof Array) {
-        //         if (middleware.middleware.handler.length) {
-        //             for (let x = 0; x < middleware.middleware.handler.length; x++) {
-        //                 const requestHandler = middleware.middleware.handler[x];
-
-        //                 if (typeof requestHandler === "function") {
-        //                     handlers.push(requestHandler);
-        //                 }
-        //                 else {
-        //                     console.log(`⚠️  The middleware.handler[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
-        //                 }
-        //             }
-        //         }
-        //         else {
-        //             console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
-        //         }
-        //     }
-        //     else if (typeof middleware.middleware.handler === "function") {
-        //         handlers.push(middleware.middleware.handler);
-        //     }
-        //     else if (middleware.middleware.handler) {
-        //         console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.handler}'`);
-        //     }
-        //     else if (
-        //         !(middleware.middleware.errors instanceof Array) &&
-        //         !("errors" in middleware.middleware)
-        //     ) {
-        //         console.log(`⚠️  The middleware.handler on '${middleware.route.flat_segments}' is empty!`);
-        //     }
-
-        //     if (handlers.length) {
-        //         // Append request handlers (middlewares)
-        //         this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
-        //             handler.bind(middleware.middleware)
-        //         )));
-
-        //         console.log("✅ Middleware loaded: " + middleware.route.flat_segments.cyan);
-        //     }
-        // }
-
-        // // Traverse all controllers
-        // for (const controller of controllers) {
-        //     const methods_loaded: IMethod[] = [];
-
-        //     // Traverse all methods
-        //     for (const method in methods) {
-
-        //         // Get method function
-        //         const controllerMethod = controller.controller[method as IMethod];
-
-        //         // Validate method into controller
-        //         if (typeof controllerMethod === "function") {
-        //             // Append method loaded
-        //             methods_loaded.push(method as IMethod);
-
-        //             // Append request handler
-        //             this.app.use(
-        //                 controller.route.flat_segments_express,
-        //                 controllerMethod!.bind(controller.controller)
-        //             );
-        //         }
-        //         else if (controllerMethod) {
-        //             console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' has an invalid type '${typeof controllerMethod}'`);
-        //         }
-        //         else if (method in controller.controller) {
-        //             console.log(`⚠️  The ${method} method on '${controller.route.flat_segments}' is empty`);
-        //         }
-        //     }
-
-        //     if (methods_loaded) {
-        //         console.log(
-        //             "✅ Controller loaded: " + controller.route.flat_segments.cyan,
-        //             methods_loaded.map((m) => (
-        //                 methods[m]
-        //             )).join(",")
-        //         );
-        //     }
-        // }
-
-        // // Traverse all middlewares to append errors requests handlers
-        // for (const middleware of middlewares) {
-        //     // All requests handler
-        //     const handlers: IErrorRequestHandler[] = [];
-
-        //     // Validate multiples middlewares
-        //     if (middleware.middleware.errors instanceof Array) {
-        //         if (middleware.middleware.errors.length) {
-        //             for (let x = 0; x < middleware.middleware.errors.length; x++) {
-        //                 const requestHandler = middleware.middleware.errors[x];
-
-        //                 if (typeof requestHandler === "function") {
-        //                     handlers.push(requestHandler);
-        //                 }
-        //                 else {
-        //                     console.log(`⚠️  The middleware.errors[${x}] on '${middleware.route.flat_segments}' has an invalid type '${typeof requestHandler}'`);
-        //                 }
-        //             }
-        //         }
-        //         else {
-        //             console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' is empty!`);
-        //         }
-        //     }
-        //     else if (typeof middleware.middleware.errors === "function") {
-        //         handlers.push(middleware.middleware.errors);
-        //     }
-        //     else if (middleware.middleware.errors) {
-        //         console.log(`⚠️  The middleware.errors on '${middleware.route.flat_segments}' has an invalid type '${typeof middleware.middleware.errors}'`);
-        //     }
-
-        //     if (handlers.length) {
-        //         // Append request handlers (middlewares)
-        //         this.app.use(middleware.route.flat_segments_express, ...handlers.map((handler) => (
-        //             handler.bind(middleware.middleware)
-        //         )));
-
-        //         console.log("✅ CatchError loaded: " + middleware.route.flat_segments.cyan);
-        //     }
-        // }
+        // Traverse all middlewares to extract all error requests handlers
+        for(const middleware of middlewares) {
+            switch (middleware.status) {
+                case "loaded":
+                    const errors = middleware.module.error instanceof Array ? middleware.module.error : middleware.module.error ? [middleware.module.error] : [];
+                    
+                    if(errors.length) {
+                        // Get segment info
+                        const segmentInfo = getSegmentInfo(middleware.route.flat_segments_express);
+                        // Append middleware loaded
+                        segmentInfo.middleware = middleware;
+                        // Append request errors (middlewares)
+                        this.app.use(middleware.route.flat_segments_express, ...errors.map((error) => (
+                            error.bind(middleware.module)
+                        )));
+                    }
+                    break;}
+        }
 
         for(const pathItem in segments) {
             const segmentItem = segments[pathItem];
